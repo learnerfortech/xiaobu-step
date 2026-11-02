@@ -1,6 +1,8 @@
 # 小步 step（xiaobu-step）
 
-家里自用的两娃作业管理小工具：孩子端点清单、家长端看完成与检查（待确认／未完成／已完成）。纸笔作业可拍照后由家长确认。
+**作业管理系统 / homework tracker（开源）** — 两娃家庭自用：孩子端点作业清单，家长端看完成与检查（待确认／未完成／已完成）；纸笔作业拍照后由家长确认。
+
+Open-source local family homework management for two kids: child checklist + parent review (pending confirm / incomplete / done), with photo proof for paper work.
 
 > 当前主要在家里局域网使用；本仓库开源的是前端与局域网服务代码，**不含**真实作业库、孩子照片与课程材料。
 

@@ -1,0 +1,490 @@
+[
+  {
+    "key": "py:initial:b",
+    "file": "initial-b.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/b.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 1.175571,
+    "sha256": "bb47c9b66a619a9cad8aa451e4d633910b1b147f03b43fbe2ce3443d141c9d03"
+  },
+  {
+    "key": "py:initial:d",
+    "file": "initial-d.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/d.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 1.071,
+    "sha256": "e7c50ef59ec1cfa4c67b7d5449b90cc616041e6a9f88f06fc947324801e65f34"
+  },
+  {
+    "key": "py:initial:f",
+    "file": "initial-f.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/f.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 1.175571,
+    "sha256": "0c824c69939e8b6fab45e3c7b45358312c9222b9b8e4ce17559c5f802c26462f"
+  },
+  {
+    "key": "py:initial:g",
+    "file": "initial-g.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/g.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 0.966571,
+    "sha256": "d3f6dc4847bbbed94d75723473f4ac0b42e9e05d537eb663ef3bfb186cea2bba"
+  },
+  {
+    "key": "py:initial:h",
+    "file": "initial-h.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/h.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 1.149429,
+    "sha256": "f9689baa9a453532fec1c4bb0f9df1a0a66cd27f08b99e8e9c970318ded99d61"
+  },
+  {
+    "key": "py:initial:l",
+    "file": "initial-l.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/l.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 0.966571,
+    "sha256": "a4a8472cbbf51158473751f27df32751fd08c62eb6e6b7552f796cd0e817ffaf"
+  },
+  {
+    "key": "py:initial:m",
+    "file": "initial-m.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/m.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 1.097143,
+    "sha256": "5b9b346e67d8b695709f7c81824d0eadb30770ccb55ce555333269f0f55de9d9"
+  },
+  {
+    "key": "py:initial:n",
+    "file": "initial-n.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/n.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 1.044857,
+    "sha256": "e9f413748e34d6b8a54b645f643bdd3b2929573e5e4b33cee8d171f4d22c34a5"
+  },
+  {
+    "key": "py:initial:p",
+    "file": "initial-p.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/p.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 0.966571,
+    "sha256": "03330c729811bafec19e7ffec8983cc889b76066b0237715c1ba541a4c20be50"
+  },
+  {
+    "key": "py:initial:t",
+    "file": "initial-t.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/t.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 1.044857,
+    "sha256": "cf7d353f6878b117a5062c3a32967ba6920d50add983e548fab43bb77571cb91"
+  },
+  {
+    "key": "py:initial:x",
+    "file": "initial-x.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/x.mp3",
+    "credit": "cmguo/PinYinSound: standalone initial recording",
+    "duration": 1.175571,
+    "sha256": "a6199061aff9766424fac52f70124987a339f446a1a3cf620439329cdaea05b8"
+  },
+  {
+    "key": "py:final:a",
+    "file": "final-a.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/a.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 0.862042,
+    "sha256": "ec46570183c0909ffbd3e9585f810e06543fe245e165ccdb4f7c3f1ac35bd954"
+  },
+  {
+    "key": "py:final:ai",
+    "file": "final-ai.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/ai.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 0.862,
+    "sha256": "1d2fb1a82a33d6cedb4a239225e2b4c928c8bd33e648631fb9f4b913843ea631"
+  },
+  {
+    "key": "py:final:an",
+    "file": "final-an.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/an.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 0.888143,
+    "sha256": "950315c1a0835f962136a41ae0361e599fe89a0c2931bdc6fa28e6112ad7d1bf"
+  },
+  {
+    "key": "py:final:ang",
+    "file": "final-ang.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/ang.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 0.809857,
+    "sha256": "1413900fc73bc157872dd5048c6520965396db6ca359b3e301168b37873892b8"
+  },
+  {
+    "key": "py:final:ao",
+    "file": "final-ao.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/ao.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 0.940429,
+    "sha256": "e05c738454da5d6a236e4e82f67485ecab9fdbdee2551b6ed979c34c41f21456"
+  },
+  {
+    "key": "py:final:ei",
+    "file": "final-ei.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/ei.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 1.018714,
+    "sha256": "2d52e845d168c1273b36873815b04cb88171877ff70ddac0872b571f6b3004ed"
+  },
+  {
+    "key": "py:final:i",
+    "file": "final-i.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/i.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 1.201571,
+    "sha256": "2bcf87a7fcfa0c99d9a06063c3742597889e731bd4b5fccc1e0718574d642696"
+  },
+  {
+    "key": "py:final:o",
+    "file": "final-o.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/o.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 1.253857,
+    "sha256": "e09204d534601116cdc9a8b971365043a6d4df869eff580e2318933dd4fbb013"
+  },
+  {
+    "key": "py:final:ong",
+    "file": "final-ong.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/ong.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 0.888143,
+    "sha256": "6c5b7fc25c2f83adc603f2587afc2972929d7583eb111a3caca37c33bef6a56d"
+  },
+  {
+    "key": "py:final:u",
+    "file": "final-u.mp3",
+    "url": "https://raw.githubusercontent.com/cmguo/PinYinSound/62453b2a5ca6873eac1f4293b6e9794715d0fc8a/u.mp3",
+    "credit": "cmguo/PinYinSound: standalone final recording",
+    "duration": 1.149429,
+    "sha256": "7d94aabada865904725a1d5662884de2ca8c16e7c7140c855b3df051a511e91e"
+  },
+  {
+    "key": "py:full:bo1",
+    "file": "syllable-bo1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-bo1.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 0.936,
+    "sha256": "440d76b7ebb1c5a39771f20a2668ff9d97124b5a45531dea312914a5dd66b871"
+  },
+  {
+    "key": "py:word:bo1",
+    "file": "word-bo1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E6%B3%A2%E6%B5%AA.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.22775,
+    "sha256": "230ede0f58520691c540d60c27f03d009f8ee184bf54ecd3baf2583dab95f2f5"
+  },
+  {
+    "key": "py:full:bi3",
+    "file": "syllable-bi3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-bi3.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.176,
+    "sha256": "0a0a33c7578a668435c9be0c859455bf6c18b508e0c046bab33c3da7eea1ec37"
+  },
+  {
+    "key": "py:word:bi3",
+    "file": "word-bi3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E9%93%85%E7%AC%94.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.515,
+    "sha256": "324c89c30efd42d99c66546f5345a0d08272e827ea523e3462178b96f3f1e95a"
+  },
+  {
+    "key": "py:full:pao3",
+    "file": "syllable-pao3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-pao3.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.392,
+    "sha256": "14d850bcb3da84726e1b2d3259744ad881c5ea8b51cfe1e20274112b323e03c7"
+  },
+  {
+    "key": "py:word:pao3",
+    "file": "word-pao3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E8%B7%91%E6%AD%A5.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.306,
+    "sha256": "c2b5db73dd347ca8d1623eacff807bb6017afea4e6d5eef86acb4b324d56b2ef"
+  },
+  {
+    "key": "py:full:pai2",
+    "file": "syllable-pai2.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-pai2.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.08,
+    "sha256": "8dc8f43e80757f60eca0e7e1073075aeb08c94b16dffa41d0ea4fbe1f9e5930b"
+  },
+  {
+    "key": "py:word:pai2",
+    "file": "word-pai2.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E6%8E%92%E9%98%9F.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.35825,
+    "sha256": "db2708d3fe0436eba2f5c007748f7880bf51389d6f9a03227266fce012190ba9"
+  },
+  {
+    "key": "py:full:ma1",
+    "file": "syllable-ma1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-ma1.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.032,
+    "sha256": "6a3194446f891fceb224d2a2497c284203566a2859cc7e0ac2fe4060be69ec3f"
+  },
+  {
+    "key": "py:word:ma1",
+    "file": "word-ma1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E5%A6%88%E5%A6%88.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.071,
+    "sha256": "79e275d65845ae0cc99862afeb9ce00bf7ea9f02c32f7485049ae98ff5579a1e"
+  },
+  {
+    "key": "py:full:mi3",
+    "file": "syllable-mi3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-mi3.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.344,
+    "sha256": "a318c39ec6096a6625bd1d4f64d990b7669f1825bad9e5d921d9ca94b3d75a6f"
+  },
+  {
+    "key": "py:word:mi3",
+    "file": "word-mi3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E5%A4%A7%E7%B1%B3.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.35825,
+    "sha256": "a14a156b5695eae6c402badce329df18adb7d11a85aeeb8eeef179aecdf9ab94"
+  },
+  {
+    "key": "py:full:fei1",
+    "file": "syllable-fei1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-fei1.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 0.984,
+    "sha256": "d8b649ef715e7b728c5a71b22c47781ec59ce85ad91b4321823414a071980719"
+  },
+  {
+    "key": "py:word:fei1",
+    "file": "word-fei1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E9%A3%9E%E6%9C%BA.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.253875,
+    "sha256": "27105f66bfef07eb84d14a5115adc465c7ab4949f04e0f1da3ffd92515333c0f"
+  },
+  {
+    "key": "py:full:fan4",
+    "file": "syllable-fan4.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-fan4.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 0.888,
+    "sha256": "9c084a932fe6ae0fcb4e1d06d218b48d6e811ff9319d1489058931ed8f101cdc"
+  },
+  {
+    "key": "py:word:fan4",
+    "file": "word-fan4.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E7%B1%B3%E9%A5%AD.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.35825,
+    "sha256": "ccdfca59dad9c0bc5c88bff4b9bbd3f9d403954e6538ec1ae0374ac761490101"
+  },
+  {
+    "key": "py:full:da3",
+    "file": "syllable-da3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-da3.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.128,
+    "sha256": "90581852ee3871ea69c3d0cc46e1ebaf89c4b7680013e29c832d26efed330255"
+  },
+  {
+    "key": "py:word:da3",
+    "file": "word-da3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E6%89%93%E6%89%AB.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.306,
+    "sha256": "f7cf67de2dd09080279c27271354cb28f575046c7d5dad30d6108512f902c004"
+  },
+  {
+    "key": "py:full:di4",
+    "file": "syllable-di4.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-di4.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 0.936,
+    "sha256": "e823aa5989e503b613ef45249a1c0b49da35d7784241b0de582ecf2d4a876785"
+  },
+  {
+    "key": "py:word:di4",
+    "file": "word-di4.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E5%9C%9F%E5%9C%B0.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.253875,
+    "sha256": "4c04d27eac1cfae8ab02e9b897ddd50a4a64025592fc641ee5349e87fad44c92"
+  },
+  {
+    "key": "py:full:ta1",
+    "file": "syllable-ta1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-ta1.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 0.936,
+    "sha256": "e6f740824be02eb03a35ff08ff4973fd3c4ac1cb38ae9511d3566564e9791aab"
+  },
+  {
+    "key": "py:word:ta1",
+    "file": "word-ta1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E4%BB%96%E4%BB%AC.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.12325,
+    "sha256": "ec46c9c60276924ea12f132740b2c2e913843ad4a889abeddf42e5c90cd0ec10"
+  },
+  {
+    "key": "py:full:tu4",
+    "file": "syllable-tu4.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-tu4.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 0.888,
+    "sha256": "f653d08102d3702c4068a16e761abc76154a2a491c433e229e52a85fea608abb"
+  },
+  {
+    "key": "py:word:tu4",
+    "file": "word-tu4.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E5%85%94%E5%AD%90.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.12325,
+    "sha256": "acb45b2a7add1f32ab63f446e5b130b277f1e768f84e373d24679999c4a51c8d"
+  },
+  {
+    "key": "py:full:nai3",
+    "file": "syllable-nai3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-nai3.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.296,
+    "sha256": "5265b001571da905423112beb23c779c9f89741e6c3caa6b12c22b91b9979f56"
+  },
+  {
+    "key": "py:word:nai3",
+    "file": "word-nai3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E7%89%9B%E5%A5%B6.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.4105,
+    "sha256": "4f9635da3f0115317f67bbe3b1fb8f1ecc4d1f50e67927869938f34a6a8cc5d8"
+  },
+  {
+    "key": "py:full:ni2",
+    "file": "syllable-ni2.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-ni2.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.032,
+    "sha256": "682ba5fd2287d0af1d44c64e28c551c786d03e86165d9be23fd03c98be336b26"
+  },
+  {
+    "key": "py:word:ni2",
+    "file": "word-ni2.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E6%B3%A5%E5%9C%9F.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.35825,
+    "sha256": "dd914c8f8df5460744110aac930ddd2c8ca4e76c2208258f1d0b49617a9e219b"
+  },
+  {
+    "key": "py:full:la3",
+    "file": "syllable-la3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-la3.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.344,
+    "sha256": "2771c578d82c2436d2fd8d2e95010cd808b14169c4cd36481f0203de77307985"
+  },
+  {
+    "key": "py:word:la3",
+    "file": "word-la3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E5%96%87%E5%8F%AD.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.1755,
+    "sha256": "1823a9fe1aab4ad4289d273718384251b25e5d6ec9b6512ed13f733667ca3d94"
+  },
+  {
+    "key": "py:full:lu4",
+    "file": "syllable-lu4.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-lu4.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 0.984,
+    "sha256": "d8dc086d7076774fdbe321f0b1586e91b89c5cc6b43ab97c09d2e295682f48d6"
+  },
+  {
+    "key": "py:word:lu4",
+    "file": "word-lu4.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E9%A9%AC%E8%B7%AF.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.306,
+    "sha256": "c8d5653f0c670095943d79a1f5d759ddf3f52f0da0f0bf1d8aef8b000468bfa0"
+  },
+  {
+    "key": "py:full:hua1",
+    "file": "syllable-hua1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-hua1.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.128,
+    "sha256": "c2f5249f29efa8beec3178cfd2919951ac2dab49184b2d1a03c607ea1b79fe2e"
+  },
+  {
+    "key": "py:word:hua1",
+    "file": "word-hua1.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E8%8A%B1%E6%9C%B5.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.306,
+    "sha256": "6da12ebc81d3a39273965f60bd58b90fb307ce0fdf9e339ad214ba53e03707d3"
+  },
+  {
+    "key": "py:full:guo3",
+    "file": "syllable-guo3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-guo3.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.344,
+    "sha256": "d4ce695b0bb2b5248ace944ba2d855778d27b63055b1aa0f43f08c644a7d0c7b"
+  },
+  {
+    "key": "py:word:guo3",
+    "file": "word-guo3.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E6%B0%B4%E6%9E%9C.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.4105,
+    "sha256": "7cc2ced94631121a43af6a01b25d373971732f3bd78c1d6dc2f59b37c7e07fdf"
+  },
+  {
+    "key": "py:full:xiong2",
+    "file": "syllable-xiong2.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-xiong2.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.128,
+    "sha256": "299f9438b5bb82075d8b72d3d623ad1250dd1d81ec26f07437afdec72f576f7e"
+  },
+  {
+    "key": "py:word:xiong2",
+    "file": "word-xiong2.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E7%86%8A%E7%8C%AB.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.4105,
+    "sha256": "8d511dcfcaeae223ffd096f4bb53d669b5a0a1d0f66d8c3a6990e317dfb2e499"
+  },
+  {
+    "key": "py:full:liang2",
+    "file": "syllable-liang2.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/syllabs/cmn-liang2.mp3",
+    "credit": "Chen Wang / audio-cmn / CC BY-SA",
+    "duration": 1.128,
+    "sha256": "dfb6115478361b4d8f42c5f6a280c1cfbeed715ec41b54611c470b957afb2d5d"
+  },
+  {
+    "key": "py:word:liang2",
+    "file": "word-liang2.mp3",
+    "url": "https://raw.githubusercontent.com/hugolpz/audio-cmn/f759a0f18f27690742957619e1248ed91e9b3f2c/64k/hsk/cmn-%E5%87%89%E6%B0%B4.mp3",
+    "credit": "Yue Tan / SWAC / audio-cmn / CC BY-SA",
+    "duration": 1.35825,
+    "sha256": "2c2447553d95ea8ed56b12e56c9017d677deeecef1068f6f3947ab059abc7d73"
+  }
+]

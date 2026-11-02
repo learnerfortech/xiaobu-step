@@ -1,0 +1,87 @@
+/* 小步 · Tidy Steps — 设计 tokens v4（与 Figma 草稿中的变量同名同值）
+   命名：--ts-<族>-<档>（基础色） / --ts-<语义>（组件只用语义层） */
+@font-face{font-family:"TS Baloo";src:url(../fonts/baloo2.woff2) format("woff2");font-weight:400 800;font-display:swap}
+@font-face{font-family:"TS Nunito";src:url(../fonts/nunito.woff2) format("woff2");font-weight:200 1000;font-display:swap}
+@font-face{font-family:"TS Noto SC";src:url(../fonts/notosanssc.woff2) format("woff2");font-weight:100 900;font-display:swap}
+:root{
+  /* ---- 基础色 Primitives ---- */
+  --ts-sky-50:#EAF6FF; --ts-sky-100:#CFEAFF; --ts-sky-300:#7CC7FF; --ts-sky-500:#1E9BFF; --ts-sky-700:#0A6AD6;
+  --ts-coral-50:#FFF0EA; --ts-coral-300:#FFA284; --ts-coral-500:#FF6236; --ts-coral-700:#DB3E14;
+  --ts-sun-50:#FFF8D9; --ts-sun-300:#FFE066; --ts-sun-500:#FFC414; --ts-sun-700:#E59400;
+  --ts-leaf-50:#E8FBEA; --ts-leaf-300:#7EE29A; --ts-leaf-500:#2CC55A; --ts-leaf-700:#139440;
+  --ts-grape-50:#F2ECFF; --ts-grape-300:#B89BFF; --ts-grape-500:#8257FF; --ts-grape-700:#5B2FE0;
+  --ts-peach-50:#FFF1E6; --ts-peach-300:#FFC08F; --ts-peach-500:#FF9640; --ts-peach-700:#E86A12;
+  --ts-ink-900:#2A2342; --ts-ink-600:#5E5775; --ts-ink-300:#BDB7CC; --ts-ink-100:#ECE9F3;
+  --ts-white:#FFFFFF; --ts-cream:#FFFBF2;
+
+  /* ---- 语义色 Color (Light) ---- */
+  --ts-bg-canvas:var(--ts-sky-50); --ts-bg-canvas-warm:var(--ts-cream); --ts-bg-surface:var(--ts-white); --ts-bg-sunken:var(--ts-ink-100);
+  --ts-text-primary:var(--ts-ink-900); --ts-text-secondary:var(--ts-ink-600); --ts-text-on-color:var(--ts-white);
+  --ts-action-primary:var(--ts-leaf-500); --ts-action-primary-depth:var(--ts-leaf-700); --ts-action-primary-light:var(--ts-leaf-300);
+  --ts-door-pinyin:var(--ts-sky-500); --ts-door-pinyin-depth:var(--ts-sky-700); --ts-door-pinyin-light:var(--ts-sky-300);
+  --ts-door-story:var(--ts-coral-500); --ts-door-story-depth:var(--ts-coral-700); --ts-door-story-light:var(--ts-coral-300);
+  --ts-door-count:var(--ts-grape-500); --ts-door-count-depth:var(--ts-grape-700); --ts-door-count-light:var(--ts-grape-300);
+  --ts-accent-sun:var(--ts-sun-500); --ts-accent-sun-light:var(--ts-sun-300); --ts-accent-sun-depth:var(--ts-sun-700);
+  --ts-mascot-body:var(--ts-peach-500); --ts-mascot-body-light:var(--ts-peach-300); --ts-mascot-body-depth:var(--ts-peach-700); --ts-mascot-belly:var(--ts-peach-50);
+  --ts-icon-surface:var(--ts-white); --ts-icon-glyph:var(--ts-ink-900); --ts-line-soft:var(--ts-ink-300);
+  --ts-letter-b:var(--ts-sky-500); --ts-letter-a:var(--ts-coral-500); --ts-letter-o:var(--ts-sun-500); --ts-letter-i:var(--ts-leaf-500); --ts-letter-u:var(--ts-grape-500);
+
+  /* ---- 间距 / 圆角 / 尺寸 ---- */
+  --ts-space-1:4px; --ts-space-2:8px; --ts-space-3:12px; --ts-space-4:16px; --ts-space-6:24px; --ts-space-8:32px; --ts-space-12:48px;
+  --ts-radius-sm:12px; --ts-radius-md:20px; --ts-radius-lg:28px; --ts-radius-xl:40px; --ts-radius-full:999px;
+  --ts-size-tap-min:72px; --ts-size-icon-btn:64px; --ts-size-primary-btn:112px;
+  --ts-elevation-depth-sm:6px; --ts-elevation-depth-md:10px; --ts-elevation-depth-lg:14px;
+
+  /* ---- 字体 ---- */
+  --ts-font-cn:"TS Noto SC","Noto Sans SC","PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+  --ts-font-latin:"TS Baloo","Baloo 2","SF Pro Rounded",ui-rounded,"TS Noto SC",sans-serif;
+  --ts-font-ui:"TS Nunito","Nunito",ui-rounded,"TS Noto SC","PingFang SC",sans-serif;
+  --ts-type-hero:900 44px/52px var(--ts-font-cn);
+  --ts-type-door:900 32px/40px var(--ts-font-cn);
+  --ts-type-section:700 24px/32px var(--ts-font-cn);
+  --ts-type-story:700 30px/42px var(--ts-font-cn);
+  --ts-type-doc:400 16px/24px var(--ts-font-cn);
+  --ts-type-label:700 14px/20px var(--ts-font-cn);
+  --ts-type-letter:800 88px/88px var(--ts-font-latin);
+  --ts-type-pinyin:800 96px/104px var(--ts-font-latin);
+  --ts-type-number:800 140px/140px var(--ts-font-latin);
+  --ts-type-badge:800 28px/28px var(--ts-font-latin);
+
+  /* ---- 彩色阴影：3D = 实心厚度 + 同色柔影 + 顶部高光 + 底部内暗 ---- */
+  --ts-raised-primary:0 10px 0 #139440,0 22px 28px -4px rgba(19,148,64,.32),inset 0 5px 2px rgba(255,255,255,.45),inset 0 -6px 0 rgba(19,148,64,.30);
+  --ts-raised-pinyin:0 10px 0 #0A6AD6,0 22px 28px -4px rgba(10,106,214,.32),inset 0 5px 2px rgba(255,255,255,.45),inset 0 -6px 0 rgba(10,106,214,.30);
+  --ts-raised-story:0 10px 0 #DB3E14,0 22px 28px -4px rgba(219,62,20,.32),inset 0 5px 2px rgba(255,255,255,.45),inset 0 -6px 0 rgba(219,62,20,.30);
+  --ts-raised-count:0 10px 0 #5B2FE0,0 22px 28px -4px rgba(91,47,224,.32),inset 0 5px 2px rgba(255,255,255,.45),inset 0 -6px 0 rgba(91,47,224,.30);
+  --ts-raised-sun:0 10px 0 #E59400,0 22px 28px -4px rgba(229,148,0,.32),inset 0 5px 2px rgba(255,255,255,.55),inset 0 -6px 0 rgba(229,148,0,.30);
+  --ts-raised-white:0 6px 0 #C9D9EA,0 14px 22px -6px rgba(30,155,255,.25),inset 0 4px 2px rgba(255,255,255,.9),inset 0 -4px 0 rgba(201,217,234,.5);
+  --ts-pressed-primary:0 3px 0 #139440,0 8px 12px -4px rgba(19,148,64,.25),inset 0 4px 6px rgba(19,148,64,.30);
+  --ts-pressed-pinyin:0 3px 0 #0A6AD6,0 8px 12px -4px rgba(10,106,214,.25),inset 0 4px 6px rgba(10,106,214,.30);
+  --ts-pressed-story:0 3px 0 #DB3E14,0 8px 12px -4px rgba(219,62,20,.25),inset 0 4px 6px rgba(219,62,20,.30);
+  --ts-pressed-count:0 3px 0 #5B2FE0,0 8px 12px -4px rgba(91,47,224,.25),inset 0 4px 6px rgba(91,47,224,.30);
+  --ts-pressed-sun:0 3px 0 #E59400,0 8px 12px -4px rgba(229,148,0,.25),inset 0 4px 6px rgba(229,148,0,.30);
+  --ts-pressed-white:0 2px 0 #C9D9EA,0 6px 10px -4px rgba(30,155,255,.2),inset 0 3px 5px rgba(201,217,234,.6);
+  --ts-card-soft:0 16px 36px -6px rgba(30,155,255,.14),0 2px 4px rgba(42,35,66,.06);
+
+  /* ---- 动效 ---- */
+  --ts-ease-spring:cubic-bezier(.34,1.56,.64,1);   /* 过冲 */
+  --ts-ease-anticipate:cubic-bezier(.36,-0.4,.5,1); /* 先蓄力 */
+  --ts-ease-out:cubic-bezier(.22,1,.36,1);
+  --ts-dur-fast:160ms; --ts-dur-base:320ms; --ts-dur-slow:640ms;
+}
+/* 通用 3D 胖按钮：.ts-btn + .ts-<hue>；按下时下沉（只动 transform） */
+.ts-btn{position:relative;border:0;cursor:pointer;color:var(--ts-text-on-color);font:900 24px/1 var(--ts-font-cn);border-radius:var(--ts-radius-xl);
+  transition:transform var(--ts-dur-fast) var(--ts-ease-out),box-shadow var(--ts-dur-fast) var(--ts-ease-out);-webkit-tap-highlight-color:transparent}
+.ts-btn::after{content:"";position:absolute;left:12%;right:46%;top:6px;height:min(14%,18px);border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0));pointer-events:none}
+.ts-primary{background:linear-gradient(180deg,#5FE27F 0%,var(--ts-leaf-500) 60%);box-shadow:var(--ts-raised-primary)}
+.ts-pinyin{background:linear-gradient(180deg,#5CB8FF 0%,var(--ts-sky-500) 60%);box-shadow:var(--ts-raised-pinyin)}
+.ts-story{background:linear-gradient(180deg,#FF8A63 0%,var(--ts-coral-500) 60%);box-shadow:var(--ts-raised-story)}
+.ts-count{background:linear-gradient(180deg,#A07DFF 0%,var(--ts-grape-500) 60%);box-shadow:var(--ts-raised-count)}
+.ts-sun{background:linear-gradient(180deg,#FFE066 0%,var(--ts-sun-500) 60%);box-shadow:var(--ts-raised-sun);color:var(--ts-ink-900)}
+.ts-white{background:linear-gradient(180deg,#fff 0%,#F4F9FF 100%);box-shadow:var(--ts-raised-white);color:var(--ts-ink-900)}
+.ts-btn:active,.ts-btn.is-pressed{transform:translateY(7px)}
+.ts-primary:active,.ts-primary.is-pressed{box-shadow:var(--ts-pressed-primary)}
+.ts-pinyin:active,.ts-pinyin.is-pressed{box-shadow:var(--ts-pressed-pinyin)}
+.ts-story:active,.ts-story.is-pressed{box-shadow:var(--ts-pressed-story)}
+.ts-count:active,.ts-count.is-pressed{box-shadow:var(--ts-pressed-count)}
+.ts-sun:active,.ts-sun.is-pressed{box-shadow:var(--ts-pressed-sun)}
+.ts-white:active,.ts-white.is-pressed{box-shadow:var(--ts-pressed-white);transform:translateY(4px)}

@@ -6,6 +6,27 @@ Open-source local family homework management for two kids: child checklist + par
 
 > 当前主要在家里局域网使用；本仓库开源的是前端与局域网服务代码，**不含**真实作业库、孩子照片与课程材料。
 
+**这是什么／不是什么**
+
+- **不是**现成的 App，也没有一个点开就能用的网址。
+- **是**小网站的源码，要在你自己的电脑（Mac）上跑起来。
+- **不含**真实作业数据：没有孩子照片，也没有课程和作业内容。
+
+## ⭐ 具体怎么用
+
+> [!IMPORTANT]
+> **把本仓库链接丢给 Cursor、ChatGPT 或其他 AI，对它说：**
+>
+> **「按 README 在我 Mac 上装起来，用空数据目录，起 8766。」**
+>
+> 链接：<https://github.com/learnerfortech/xiaobu-step>
+
+AI 会按下面的「快速开始（Mac）」在你的 Mac 上装。装好之后：
+
+1. 手机、平板和这台 Mac 连**同一个 Wi‑Fi**，用浏览器打开入口（地址写在下方「快速开始（Mac）」里）。
+2. 作业要你自己加，也可以再让 AI 帮你挂到**本机**的库里。
+3. **别把真实照片、真实作业推回这个公开仓库。**
+
 ## 目录
 
 - `frontend/` — 静态前端（打开 `index.html`）

@@ -1,0 +1,43 @@
+name: Feature request
+description: Describe a user problem or a possible improvement
+title: "[Idea]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with the problem, not the proposed feature. Do not include private family information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: What currently takes too much time or makes the workflow difficult?
+    validations:
+      required: true
+  - type: textarea
+    id: users
+    attributes:
+      label: Who experiences this problem?
+      description: For example, a parent, a child who reads independently, or a younger child who needs adult support.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround
+      description: How do you handle this today?
+    validations:
+      required: false
+  - type: textarea
+    id: idea
+    attributes:
+      label: Possible improvement
+      description: What would make the workflow easier? Alternatives are welcome.
+    validations:
+      required: false
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: What should this not make harder?
+      description: Consider privacy, setup, maintenance, child independence, and parent workload.
+    validations:
+      required: false

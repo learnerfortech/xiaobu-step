@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem in Xiaobu Step
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach real homework, children's photos, names, school details, databases, credentials, or unredacted logs. Use synthetic examples only.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Release tag or commit SHA, if known.
+      placeholder: main / commit SHA / not sure
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Device, operating system, browser, and network setup.
+      placeholder: Mac model, macOS version, Android tablet/browser, same Wi-Fi or not
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest steps that reproduce the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted error message or screenshot
+      description: Remove personal information and private family data before attaching anything.
+    validations:
+      required: false

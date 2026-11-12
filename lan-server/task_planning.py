@@ -70,7 +70,7 @@ def weekly_overview(tasks, day, history=False):
         return ('assignment', task['assignment_id']) if task.get('assignment_id') else ('task', task['id'])
 
     selected = {group_key(task) for task in tasks
-                if relates_to_day(task, day) or (not history and task.get('status') != 'done')}
+                if relates_to_day(task, day) or (task.get('assignment_id') and task.get('plan', {}).get('start', '9999') <= day <= task.get('plan', {}).get('end', '0000')) or (not history and task.get('status') != 'done')}
     return [task for task in tasks if group_key(task) in selected]
 
 
@@ -167,3 +167,16 @@ def groups(tasks):
             group.update(deadline_conflict=True, due_days=sorted(d for d in dues if d))
         result.append(group)
     return result
+
+
+def deadline_passed(task, now=None):
+    now = now or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    raw = (task.get('plan') or {}).get('deadline')
+    if raw:
+        try:
+            due = datetime.datetime.fromisoformat(raw)
+            if due.tzinfo is not None:
+                return now > due
+        except (ValueError, TypeError):
+            pass
+    return bool(task.get('due_day') and task['due_day'] < now.date().isoformat())

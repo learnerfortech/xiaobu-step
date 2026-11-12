@@ -588,3 +588,12 @@ button.p-tile[aria-pressed="true"] { border-color:currentColor; box-shadow:0 0 0
   .p-week-overview>summary{font-size:17px}
   .p-planning-fields .p-switch{align-items:flex-start}
 }
+
+/* Local grouped materials and pale action buttons must remain readable. */
+.material-group .c-btn, .task-materials .c-btn.story, .c-mini, .c-link { color:#173e35; }
+.task-title-copy { overflow-wrap:anywhere; }
+.week-overview > summary { color:#173e35; }
+
+.week-summary { margin:16px 0; padding:16px; border-radius:16px; background:#edf5ef; color:#173e35; border:1px solid #9db5a9; }
+.week-summary h2 {margin:0 0 8px;font-size:22px;}
+.task-day-section.weekly {border-left:4px solid #648776;padding-left:12px;}

@@ -189,7 +189,7 @@ function weekOverview(child) {
   const legacy = items.filter(t => !t.assignment_id);
   if (legacy.length) groups.push({ id: 'legacy', title: '已有周作业', portions: legacy });
   return h('details.p-card.p-week-overview', { 'data-testid': 'parent-week-overview', open: !!weekOpen[child], ontoggle: e => { if (e.target.isConnected) weekOpen[child] = e.target.open; } },
-    h('summary', {}, '周作业与安排 · ' + NAME(child)),
+    h('summary', {}, '周作业与安排 · ' + NAME(child)), window.TaskPlanning.weekSummary(items, st.day),
     h('p.p-muted', {}, '每份只计算一次。未安排的内容也保留在这里；已提交的份继续等检查。'),
     ...groups.map(g => h('section.p-week-assignment', { 'data-assignment-id': g.id },
       h('h3', {}, g.title),

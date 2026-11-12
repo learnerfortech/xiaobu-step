@@ -165,8 +165,7 @@ class Tasks:
             if (t.get('title') == '自己选一本书读一会儿' and t.get('task_kind') == 'reading'
                     and t.get('carried_over')):
                 t['first_step'] = '昨天没读完，今天补上；读完再点完成。' + (t.get('first_step') or '')
-            t['deadline_passed'] = bool(t['due_day'] and t['due_day'] < planning.today()
-                                      and t.get('status') in planning.ACTIVE)
+            t['deadline_passed'] = bool(planning.deadline_passed(t) and t.get('status') in planning.ACTIVE)
             warning = planning.planning_warning(t)
             if warning:
                 t['planning_warning'] = warning

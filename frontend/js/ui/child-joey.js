@@ -94,7 +94,7 @@ const SUBJECTS = [
 ];
 const subjectOf = t => SUBJECTS.find(s => s.match.test(t.title || ''));
 const groupOf = t => flowRank(t)!==1 || t.home_group==='flow' ? 'flow' : t.work_type==='itinerary' || t.itinerary || t.id.startsWith('itinerary-') || t.home_group==='itinerary' ? 'itinerary' : 'school';
-const statusText = t => (t.carried_over ? '顺延 · ' : '') + (t.status === 'done' ? '已完成' : t.status === 'pending_parent' ? '已提交，等妈妈检查' : t.status === 'paused' ? '未完成' : '点开开始');
+const statusText = t => (t.carried_over && !Planning.isWeekly(t) ? '顺延 · ' : '') + (t.status === 'done' ? '已完成' : t.status === 'pending_parent' ? '已提交，等妈妈检查' : t.status === 'paused' ? '未完成' : '点开开始');
 function enterTask(t) {
   handoff = { id:t.id, until:Date.now()+2000 }; readTask(t); App.go('#/joey/task/'+t.id);
 }

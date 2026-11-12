@@ -141,5 +141,24 @@ function recordGroup(group, portions, onSaved = () => {}) {
   d = dialog({ title: group.title, audience: 'child', body: h('div', {}, h('p', {}, '勾选这次实际做完的部分。由你记录，网站没有自动同步。'), ...rows.map(x => x.el), message), actions: [h('button.c-btn.ghost', { type: 'button', onclick: () => d.close() }, '返回'), button] });
 }
 
-window.TaskPlanning = { taskTitle, materialKindLabels, isWeekly, paper, needsPhoto, shortDay, details, materials, progress, undoButton, recordGroup };
+function weekSummary(tasks, viewDay = APP_CONFIG.today()) {
+  const sets = new Map();
+  for (const t of tasks || []) {
+    if (!isWeekly(t) || t.home_group !== '英语作业' || !t.plan?.start || !t.plan?.end || viewDay < t.plan.start || viewDay > t.plan.end) continue;
+    const key=t.plan.id || t.plan.start+':'+t.plan.end;
+    if (!sets.has(key)) sets.set(key, []);
+    if (!sets.get(key).some(x=>x.id===t.id)) sets.get(key).push(t);
+  }
+  if (!sets.size) return null;
+  return h('section.week-summary', {'data-testid':'weekly-english-summary'}, ...[...sets.values()].map(items=>{
+    const plan=items[0].plan, done=items.filter(t=>t.status==='done').length, pending=items.filter(t=>t.status==='pending_parent').length;
+    const deadline=plan.deadline, date=deadline?.slice(0,10), time=deadline?.slice(11,16);
+    const weekday=date ? ['周日','周一','周二','周三','周四','周五','周六'][new Date(date+'T12:00:00Z').getUTCDay()] : '';
+    return h('div',{},h('h2',{},'本周英语'),h('p',{},shortDay(plan.start)+'–'+shortDay(plan.end)+(deadline?' · '+weekday+' '+time+' 前交':'')),
+      h('p',{},'已完成 '+done+' 项 · 还剩 '+(items.length-done-pending)+' 项'+(pending?' · 待家长检查 '+pending+' 项':'')),
+      h('p.planning-meta',{},'以下是本周总量，建议日期可由家长调整；不表示今天都要做完。'));
+  }));
+}
+
+window.TaskPlanning = { weekSummary, taskTitle, materialKindLabels, isWeekly, paper, needsPhoto, shortDay, details, materials, progress, undoButton, recordGroup };
 })();

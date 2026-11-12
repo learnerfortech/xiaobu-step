@@ -370,3 +370,19 @@ for (const locked of [false, true]) {
     assert.equal(xp.readOnly || xp.disabled, locked);
   });
 }
+
+test('weekly summary respects its selected window and separates pending review', () => {
+  const f = fixture();
+  const plan = {id:'synthetic-window',start:'2026-01-05',end:'2026-01-10',deadline:'2026-01-10T13:00:00+08:00'};
+  const items = ['todo','pending_parent','done'].map((status,i)=>task({id:'part-'+i,home_group:'英语作业',plan,status}));
+  const summary=f.window.TaskPlanning.weekSummary(items,'2026-01-08');
+  assert.match(summary.textContent,/01\/05–01\/10 · 周六 13:00 前交/);
+  assert.match(summary.textContent,/已完成 1 项 · 还剩 1 项 · 待家长检查 1 项/);
+  assert.equal(f.window.TaskPlanning.weekSummary(items,'2026-01-11'),null);
+});
+
+test('Joey weekly tasks never inherit stale carry labels', () => {
+ const f=fixture([task({child_id:'child_b',carried_over:true})]);
+ f.route('child-joey');
+ assert.doesNotMatch(f.root.textContent,/顺延/);
+});

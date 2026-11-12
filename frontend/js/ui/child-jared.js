@@ -132,7 +132,7 @@ function home(root, group = null) {
     h('button.c-mini', { type: 'button', onclick: async () => { for (const p of pend) await S.retry(p.key); } }, icon('refresh'), '再试一次')) : null;
   if (!list.length) {
     const host = h('div.buddy.md');
-    root.replaceChildren(screen('jared-empty', homeTop(), dateNav(), h('section.c-state', { 'data-testid': 'state-empty' }, host, h('h2', {}, viewingHistory() ? '这一天没有作业记录' : '今天没有任务')), Progress.homeBuddy('child_a'), Pledge.entry(), adjustedNotes(st), weekPanel(st)));
+    root.replaceChildren(screen('jared-empty', homeTop(), dateNav(), h('section.c-state', { 'data-testid': 'state-empty' }, host, h('h2', {}, viewingHistory() ? '这一天没有作业记录' : '今天没有任务')), Progress.homeBuddy('child_a'), Pledge.entry(), adjustedNotes(st), Planning.weekSummary(st.week, st.day), weekPanel(st)));
     mascot(host, 'happy'); return;
   }
   const active = list.filter(t => ACTIVE.includes(t.status));
@@ -183,7 +183,7 @@ function home(root, group = null) {
   }
 
   // 伙伴在上；三张分类卡紧跟，作业不再整页摊开一大串。
-  root.replaceChildren(screen(active.length ? 'jared-home' : 'jared-alldone', homeTop(), dateNav(), banner, doneBox, group ? null : Progress.homeBuddy('child_a'), group ? null : Pledge.entry(), cards, adjustedNotes(st), group ? null : weekPanel(st)));
+  root.replaceChildren(screen(active.length ? 'jared-home' : 'jared-alldone', homeTop(), dateNav(), banner, doneBox, group ? null : Progress.homeBuddy('child_a'), group ? null : Pledge.entry(), cards, adjustedNotes(st), (!group || group==='英语作业') ? Planning.weekSummary(st.week, st.day) : null, group ? null : weekPanel(st)));
 }
 
 function move(key, list, i, d, root) { if (!list[i + d] || groupOf(list[i]) !== groupOf(list[i + d])) return; const ids = list.map(t => t.id); [ids[i], ids[i + d]] = [ids[i + d], ids[i]]; Prefs.set(key, ids); home(root, selectedGroup); }

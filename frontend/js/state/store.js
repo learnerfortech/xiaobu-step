@@ -7,6 +7,15 @@
 const { TaskAdapter, RecordAdapter, uuid } = window.API;
 const C = window.APP_CONFIG;
 const day = () => (typeof C.today === "function" ? C.today() : C.DEMO_DAY);
+const owns = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+const equal = (a, b) => {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every(k => owns(b, k) && equal(a[k], b[k]));
+};
+const matches = (task, values, omit = []) => !!task && Object.entries(values).every(([k, v]) => omit.includes(k) || equal(task[k], v));
+const planningFields = ['work_type', 'planned_day', 'due_day', 'photo_required', 'original_requirement', 'materials', 'exp_award'];
 
 const Store = {
   parentDay: null,
@@ -36,7 +45,7 @@ const Store = {
     return this.tasks[k];
   },
   get(role, child) { return this.tasks[role + ':' + child] || { status: 'idle', tasks: [] }; },
-  find(role, child, id) { return this.get(role, child).tasks.find(t => t.id === id); },
+  find(role, child, id) { const state = this.get(role, child); return state.tasks.find(t => t.id === id) || (state.week || []).find(t => t.id === id); },
 
   /* 任务状态反馈（孩子：pending_parent/done/help/paused；家长：done/archived/todo） */
   feedback(role, task, status, extra = {}) {
@@ -44,8 +53,9 @@ const Store = {
     if (Object.prototype.hasOwnProperty.call(extra, 'help_note')) body.help_note = typeof extra.help_note === 'string' ? extra.help_note.trim() : extra.help_note;
     if (Object.prototype.hasOwnProperty.call(extra, 'has_mistake')) { body.has_mistake = extra.has_mistake; body.mistake_note = (extra.mistake_note || '').trim(); }
     if (Object.prototype.hasOwnProperty.call(extra, 'reading_minutes')) body.reading_minutes = extra.reading_minutes;
+    if (owns(extra, 'progress_note')) body.progress_note = typeof extra.progress_note === 'string' ? extra.progress_note.trim() : extra.progress_note;
     const op = { key: 'task:' + task.id, kind: 'feedback', role, body,
-      verify: list => { const t = list.find(x => x.id === task.id); return !!t && t.status === status && t.version >= task.version + 1 && (!Object.prototype.hasOwnProperty.call(body, 'reading_minutes') || t.reading_minutes === body.reading_minutes) && (!Object.prototype.hasOwnProperty.call(body, 'help_note') || t.help_note === body.help_note) && (!Object.prototype.hasOwnProperty.call(body, 'has_mistake') || (body.has_mistake ? t.mistake_review?.note === body.mistake_note && t.mistake_review?.status === 'pending_review' : !t.mistake_review)); } };
+      verify: list => { const t = list.find(x => x.id === task.id); return !!t && t.status === status && t.version >= task.version + 1 && (!owns(body, 'progress_note') || t.progress_note === body.progress_note) && (!Object.prototype.hasOwnProperty.call(body, 'reading_minutes') || t.reading_minutes === body.reading_minutes) && (!Object.prototype.hasOwnProperty.call(body, 'help_note') || t.help_note === body.help_note) && (!Object.prototype.hasOwnProperty.call(body, 'has_mistake') || (body.has_mistake ? t.mistake_review?.note === body.mistake_note && t.mistake_review?.status === 'pending_review' : !t.mistake_review)); } };
     return this.run(op);
   },
   assign(task, task_kind) {
@@ -56,14 +66,22 @@ const Store = {
   },
   create(fields) {
     const body = { day: this.parentDay || day(), id: uuid(), ...fields };
+    if (Array.isArray(body.portions)) body.portions = body.portions.map(p => ({ id: uuid(), ...p }));
     const op = { key: 'create:' + body.id, kind: 'create', role: 'parent', body,
-      verify: list => list.some(x => x.id === body.id && Object.entries(body).every(([k, v]) => x[k] === v)) };
+      verify: list => Array.isArray(body.portions)
+        ? body.portions.every(p => {
+          const t = list.find(x => x.id === p.id);
+          const expected = { ...body, ...p, materials: p.materials || [], id: p.id, title: body.title + ' · ' + p.label, assignment_id: body.id, assignment_title: body.title, portion_label: p.label };
+          return matches(t, expected, ['portions', 'label', 'material_url', 'audio_url']) && list.filter(x => x.id === p.id).length === 1;
+        })
+        : list.some(x => x.id === body.id && matches(x, body)) };
     return this.run(op);
   },
   update(task, fields) {
     const body = {
       day: task.day, child_id: task.child_id, task_id: task.id,
-      title: fields.title, first_step: fields.first_step,
+      title: owns(fields, 'title') ? fields.title : task.title,
+      first_step: owns(fields, 'first_step') ? fields.first_step : (task.first_step || ''),
       parent_note: fields.parent_note != null ? fields.parent_note : (task.parent_note || ''),
       material_url: fields.material_url != null ? fields.material_url : (task.material_url || ''),
       audio_url: fields.audio_url != null ? fields.audio_url : (task.audio_url || ''),
@@ -71,8 +89,12 @@ const Store = {
       assignment_state: fields.assignment_state || task.assignment_state,
       expected_version: task.version, operation_id: uuid()
     };
+    for (const key of planningFields) {
+      if (owns(fields, key)) body[key] = fields[key];
+      else if (owns(task, key)) body[key] = task[key];
+    }
     const op = { key: 'task:' + task.id, kind: 'update', role: 'parent', body,
-      verify: list => { const t = list.find(x => x.id === task.id); return !!t && ['title', 'first_step', 'parent_note', 'material_url', 'audio_url', 'task_kind', 'assignment_state', 'day', 'child_id'].every(k => t[k] === body[k]) && t.version >= task.version + 1; } };
+      verify: list => { const t = list.find(x => x.id === task.id); return !!t && matches(t, body, ['task_id', 'expected_version', 'operation_id']) && t.version >= task.version + 1; } };
     return this.run(op);
   },
   remove(task) {
@@ -86,6 +108,8 @@ const Store = {
   pendingFor(key) { return this.pending[key]; },
 
   async run(op) {
+    const previous = this.pending[op.key];
+    if (previous && previous !== op) return { result: 'rejected', op, status: 409, code: 'unresolved_operation' };
     this.pending[op.key] = op; op.state = 'saving'; this.emit();
     try {
     const send = op.kind === 'feedback' ? TaskAdapter.feedback(op.role, op.body)
@@ -97,7 +121,8 @@ const Store = {
     if (op.abandoned) return { result: 'abandoned', op };
     const child = op.body.child_id;
     if (r.status === 200) {
-      const rb = await TaskAdapter.readback(op.role, { day: op.body.day, child_id: child }, op.body.task_id || op.body.id);   // 按 ID 读回，周六完成项可退出今日列表
+      // Read by stable task/assignment ID: a re-planned portion may leave today's list.
+      const rb = await TaskAdapter.readback(op.role, { day: op.body.day, child_id: child }, op.body.task_id || op.body.id);
       if (op.abandoned) return { result: 'abandoned', op };
       if (rb.ok && op.verify(rb.data.tasks)) {
         delete this.pending[op.key];

@@ -14,7 +14,8 @@ from urllib.parse import urlsplit, parse_qs, unquote
 
 from pledges import Pledges, RULES, FORM_NAMES, form_for_lifetime, form_thresholds_for
 from local_speech import LocalSpeech
-from photos import Photos
+from photos import Photos, Rejected as PhotoRejected
+import task_planning as planning
 
 def award_points(task, task_id):
     """Per-task difficulty EXP from payload.exp_award; itinerary/default fallback. Cap 50."""
@@ -24,6 +25,10 @@ def award_points(task, task_id):
     if task.get('itinerary') or str(task_id).startswith('itinerary-'):
         return RULES.get('itinerary_exp', 1)
     return RULES.get('task_exp', 3)
+
+
+def original_award_points(award):
+    return award.get('original_points', award.get('points', 0))
 
 
 def lifetime_exp(con, child):
@@ -85,9 +90,8 @@ def fields(body):
 
 
 # Daily homework rolls by projection, never by duplicating or rewriting the task date.
-UNFINISHED = {'todo', 'doing', 'paused', 'help', 'pending_parent'}
 def daily_homework(task):
-    return (not task.get('plan') and not task.get('itinerary')
+    return (planning.work_type(task) == 'school' and not task.get('plan') and not task.get('itinerary')
             and not str(task.get('id', '')).startswith('itinerary-')
             and task.get('home_group') not in {'flow', 'itinerary'}
             and not re.search(r'-(bag-open|bag-pack|shubao)$', task.get('id', ''))
@@ -135,58 +139,106 @@ class Tasks:
     @staticmethod
     def pack(con, role, day, child, task_id=None, history=False):
         # Projection only: reading/rolling a plan never writes or initializes storage.
-        all_tasks = [json.loads(row[0]) for row in con.execute(
-            'SELECT payload FROM tasks WHERE child=? ORDER BY day,rowid', (child,))]
+        all_tasks = [dict(json.loads(row[1]), storage_day=row[0]) for row in con.execute(
+            'SELECT day,payload FROM tasks WHERE child=? ORDER BY day,rowid', (child,))]
+        reward_prefix = 'task:' + child + ':'
+        rewards = {key[len(reward_prefix):]: json.loads(payload) for key, payload in con.execute(
+            'SELECT key,payload FROM progress.pledge_progress WHERE key GLOB ?', (reward_prefix + '*',))}
         def project(t):
             t = dict(t)
-            if t.get('plan') or daily_homework(t):
-                t['planned_day'] = t['day']
-                t['day'] = day
-            if t.get('planned_day', day) < day and t.get('status') in UNFINISHED:
+            t['planned_day'] = planning.planned_day(t)
+            t['day'] = day
+            t['work_type'] = planning.work_type(t)
+            t.setdefault('created_day', None)
+            t.setdefault('due_day', None)
+            t.setdefault('original_requirement', '')
+            t.setdefault('progress_note', '')
+            t.setdefault('materials', [])
+            t['exp_award_locked'] = t['id'] in rewards
+            t['exp_award'] = (original_award_points(rewards[t['id']]) if t['exp_award_locked']
+                              else award_points(t, t['id']))
+            t.setdefault('photo_required', planning.photo_required(t))
+            t.pop('carried_over', None)
+            if (daily_homework(t) and t['planned_day'] and t['planned_day'] < day
+                    and t.get('status') in planning.UNFINISHED):
                 t['carried_over'] = True
             if (t.get('title') == '自己选一本书读一会儿' and t.get('task_kind') == 'reading'
-                    and t.get('planned_day', day) < day and t.get('status') in UNFINISHED):
-                t['carried_over'] = True
+                    and t.get('carried_over')):
                 t['first_step'] = '昨天没读完，今天补上；读完再点完成。' + (t.get('first_step') or '')
+            t['deadline_passed'] = bool(t['due_day'] and t['due_day'] < planning.today()
+                                      and t.get('status') in planning.ACTIVE)
+            warning = planning.planning_warning(t)
+            if warning:
+                t['planning_warning'] = warning
             if role == 'child':
                 t.pop('parent_note', None)
             return t
+        def available(t):
+            return not (role == 'child' and (t['status'] in planning.REMOVED
+                        or t.get('assignment_state') == 'pending'))
         def visible(t):
-            if role == 'child' and (t['status'] in {'archived', 'cancelled', 'canceled', 'deleted'} or t['assignment_state'] == 'pending'):
+            if not available(t):
                 return False
             if task_id is not None:
-                return t['id'] == task_id and (t['day'] == day or (t['day'] <= day and (bool(t.get('plan')) or daily_homework(t))))
+                # A parent can verify any stable task or entire assignment after a move.
+                if role == 'parent':
+                    return t['id'] == task_id or t.get('assignment_id') == task_id
+                return t['id'] == task_id
             if history:
-                return t['day'] == day or t.get('completed_day') == day
-            plan = t.get('plan')
-            if not plan:
-                return (t['day'] == day or (daily_homework(t) and t['day'] < day
-                        and (t['status'] in UNFINISHED or (t['status'] == 'done' and t.get('completed_day') == day))))
-            if t['day'] > day or plan.get('optional') or t['status'] in {'archived', 'cancelled', 'canceled', 'deleted'}:
-                return False
-            if t['status'] in UNFINISHED:
+                return planning.relates_to_day(t, day)
+            if t['status'] in planning.REMOVED:
+                return role == 'parent' and planning.planned_day(t) == day
+            if role == 'parent' and t.get('status') == 'pending_parent':
+                # A submitted task needs review regardless of its arrangement. Do
+                # not project a known later submission into an earlier view day.
+                return not t.get('submitted_day') or t['submitted_day'] <= day
+            if t.get('completed_day') == day or (t.get('status') == 'pending_parent' and t.get('submitted_day') == day):
                 return True
-            # Saturday and later: only unfinished tasks; completion remains in the overview.
-            return day < plan['end'] and (t.get('completed_day', t['day']) == day)
-        planned = [t for t in all_tasks if t.get('plan') and t['plan']['start'] <= day
-                   and t['status'] != 'archived' and t['assignment_state'] != 'pending']
+            if t.get('status') == 'done':
+                return not t.get('completed_day') and planning.planned_day(t) == day
+            planned = planning.planned_day(t)
+            if not planned or planned > day:
+                return False
+            if planning.work_type(t) == 'weekly':
+                return t.get('status') in planning.UNFINISHED and not (t.get('plan') or {}).get('optional')
+            if planned == day:
+                return True
+            return daily_homework(t) and t.get('status') in planning.UNFINISHED
+        planned = [t for t in all_tasks if planning.work_type(t) == 'weekly'
+                   and t['status'] not in planning.REMOVED and available(t)]
+        if task_id is None:
+            planned = planning.weekly_overview(planned, day, history=history)
+        adjusted = []
+        if task_id is None and not history:
+            for task in all_tasks:
+                if not available(task) or task.get('status') in planning.REMOVED or planning.planned_day(task) == day:
+                    continue
+                if any(a.get('from_day') == day or a.get('view_day') == day for a in task.get('adjustments', [])):
+                    adjusted.append({'id': task['id'], 'title': task['title'], 'work_type': planning.work_type(task),
+                                     'assignment_id': task.get('assignment_id'), 'from_day': day,
+                                     'planned_day': planning.planned_day(task), 'note': '安排已调整'})
+        selected_groups = planned if task_id is None else [t for t in planned if visible(t)]
         return {'dataset': 'lan', 'day': day, 'child_id': child,
                 'tasks': [project(t) for t in all_tasks if visible(t)],
-                'week': [project(t) for t in planned] if task_id is None else []}
+                'week': [project(t) for t in planned] if task_id is None else [],
+                'groups': planning.groups(selected_groups), 'adjusted': adjusted}
 
     @staticmethod
-    def reward_receipt(con, child, task_id, operation_id):
+    def reward_receipt(con, child, task_id, operation_id, replayed=False):
         row = con.execute('SELECT payload FROM progress.pledge_progress WHERE key=?', ('task:'+child+':'+task_id,)).fetchone()
         if not row:
             return {'points': 0, 'reason': 'not_eligible'}
         award = json.loads(row[0])
         same = award.get('operation_id') == operation_id
-        points = award['points'] if same else 0
+        original_points = award.get('last_delta', award['points']) if same else 0
+        points = original_points if same and not replayed else 0
         receipt = {
             'points': points,
-            'reason': 'awarded' if same else 'already_awarded',
+            'reason': ('replayed' if replayed else award.get('last_event', 'awarded')) if same else 'already_awarded',
             'day': award['day'],
-            'exp_award': award.get('points'),
+            'exp_award': original_award_points(award),
+            'original_points': original_points,
+            'replayed': replayed,
         }
         lifetime = lifetime_exp(con, child)
         form_id = form_for_lifetime(lifetime, child)
@@ -195,10 +247,95 @@ class Tasks:
         receipt['form_name'] = FORM_NAMES[form_id]
         receipt['form_changed'] = False
         # Replay the original crossing, not a crossing inferred from today's later total.
-        if same and award.get('form_receipt'):
+        if same and not replayed and award.get('form_receipt'):
             receipt.update(award['form_receipt'])
             receipt['event_id'] = operation_id
         return receipt
+
+    @staticmethod
+    def create_tasks(con, body, task_id, day, child):
+        existing = [json.loads(row[0]) for row in con.execute('SELECT payload FROM tasks')]
+        reserved = {t['id'] for t in existing} | {t.get('assignment_id') for t in existing}
+        require(task_id not in reserved, 'conflict', 409)
+        base = dict(fields(body), child_id=child)
+        if body.get('work_type') != 'weekly':
+            require('portions' not in body, 'weekly_portions_required')
+            task = dict(base, id=task_id, day=day, version=0, status='todo')
+            task.update(planning.metadata(body, task, new=True))
+            created = [task]
+        else:
+            portions = body.get('portions')
+            require(isinstance(portions, list) and 1 <= len(portions) <= 50, 'invalid_portions')
+            # Validate even common materials, but only explicitly per-portion materials are attached.
+            planning.metadata(body, base)
+            created, ids = [], set()
+            for portion in portions:
+                require(isinstance(portion, dict), 'invalid_portions')
+                require(set(portion) <= {'id', 'label', 'planned_day', 'exp_award', 'materials',
+                        'first_step', 'task_kind', 'photo_required', 'material_url', 'audio_url'}, 'invalid_portions')
+                unit_id = identifier(portion.get('id'))
+                require(unit_id not in reserved and unit_id not in ids and unit_id != task_id, 'conflict', 409)
+                ids.add(unit_id)
+                label = portion.get('label')
+                require(isinstance(label, str) and 0 < len(label.strip()) <= 60, 'invalid_portion_label')
+                require('exp_award' in portion, 'invalid_exp_award')
+                unit_body = dict(body, **portion)
+                unit_body.update(title=base['title'] + ' · ' + label.strip(),
+                                 planned_day=portion.get('planned_day'),
+                                 materials=portion.get('materials', []),
+                                 material_url=portion.get('material_url', ''), audio_url=portion.get('audio_url', ''))
+                task = dict(fields(unit_body), id=unit_id, day=day, child_id=child, version=0, status='todo',
+                            assignment_id=task_id, assignment_title=base['title'], portion_label=label.strip())
+                task.update(planning.metadata(unit_body, task, new=True))
+                created.append(task)
+        for task in created:
+            con.execute('INSERT INTO tasks VALUES(?,?,?,?,?)', (task['id'], day, child, 0, canonical(task)))
+        return created
+
+    @staticmethod
+    def change_reward(con, task, child, day, operation_id, undo=False):
+        """One fixed ledger key per portion, including a reversible undo record."""
+        key = 'task:' + child + ':' + task['id']
+        row = con.execute('SELECT version,payload FROM progress.pledge_progress WHERE key=?', (key,)).fetchone()
+        award = json.loads(row[1]) if row else None
+        if award and award.get('form_receipt'):
+            award.setdefault('original_form_receipt', dict(award['form_receipt']))
+            award.setdefault('original_operation_id', award.get('operation_id'))
+        if undo:
+            if not award or award.get('reversed'):
+                return
+            original = original_award_points(award)
+            delta, event = -int(award.get('points') or 0), 'reversed'
+            award.update(points=0, original_points=original, reversed=True)
+        else:
+            if award and not award.get('reversed'):
+                return
+            original = original_award_points(award) if award else award_points(task, task['id'])
+            delta, event = original, 'restored' if award else 'awarded'
+            if award is None:
+                award = {'kind': 'task', 'child_id': child, 'task_id': task['id'],
+                         'source': 'itinerary' if planning.work_type(task) == 'itinerary' else 'task'}
+            award.update(points=original, original_points=original, reversed=False)
+        before = lifetime_exp(con, child)
+        award.update(day=day, operation_id=operation_id, last_delta=delta, last_event=event)
+        after = before + delta
+        previous, current = form_for_lifetime(before, child), form_for_lifetime(after, child)
+        receipt = {'lifetime_exp': after, 'form_id': current, 'form_name': FORM_NAMES[current],
+                   'form_changed': event == 'awarded' and delta > 0 and previous != current}
+        if receipt['form_changed']:
+            receipt.update(form_from=previous, form_from_name=FORM_NAMES[previous],
+                           celebrate=('太乐巴戈斯' if child == 'child_a' else '喷火龙') + '变成' + FORM_NAMES[current] + '啦！')
+        award['form_receipt'] = receipt
+        if event == 'awarded':
+            award['original_form_receipt'] = dict(receipt)
+            award['original_operation_id'] = operation_id
+        award.setdefault('history', []).append({'day': day, 'operation_id': operation_id, 'points': delta,
+                                               'event': event, 'form_receipt': dict(receipt)})
+        if row:
+            con.execute('UPDATE progress.pledge_progress SET version=?,payload=? WHERE key=?',
+                        (row[0] + 1, canonical(award), key))
+        else:
+            con.execute('INSERT INTO progress.pledge_progress VALUES(?,?,?)', (key, 1, canonical(award)))
 
     def request(self, method, path, body=None):
         try:
@@ -217,7 +354,8 @@ class Tasks:
                         mark = t.get('mistake_review')
                         if t.get('status') != 'done' or t.get('task_kind') != 'paper' or not mark:
                             continue
-                        t['planned_day'] = t['day']
+                        t['storage_day'] = t['day']
+                        t['planned_day'] = planning.planned_day(t)
                         t['day'] = mark['marked_day']
                         entries.append(t)
                 entries.sort(key=lambda t: (t['day'], t['id']), reverse=True)
@@ -236,6 +374,8 @@ class Tasks:
             require(op in ({'create', 'update', 'delete', 'assign', 'feedback'} if role == 'parent' else {'feedback'}),
                     'operation_not_available', 405)
             require(type(body) is dict)
+            if role == 'child':
+                require(not (set(body) & planning.PARENT_FIELDS), 'parent_fields_forbidden', 403)
             day, child = body.get('day'), body.get('child_id')
             selection(day, child)
             task_id = identifier(body.get('id' if op == 'create' else 'task_id'))
@@ -247,39 +387,63 @@ class Tasks:
                 if prior:
                     require(prior[0] == request, 'conflict', 409)
                     result = self.pack(con, role, day, child)
-                    if op == 'feedback' and body.get('status') == 'done':
-                        result['reward'] = self.reward_receipt(con, child, task_id, body['operation_id'])
+                    if op == 'feedback' and body.get('status') in {'done', 'todo'}:
+                        result['reward'] = self.reward_receipt(con, child, task_id, body['operation_id'], replayed=True)
                     return 200, result
                 row = con.execute('SELECT payload FROM tasks WHERE id=?', (task_id,)).fetchone()
                 if op == 'create':
                     require(not row, 'conflict', 409)
-                    task = dict(fields(body), id=task_id, day=day, child_id=child, version=0, status='todo')
-                    con.execute('INSERT INTO tasks VALUES(?,?,?,?,?)', (task_id, day, child, 0, canonical(task)))
+                    self.create_tasks(con, body, task_id, day, child)
                 else:
                     require(row is not None, 'not_found', 404)
                     task = json.loads(row[0])
-                    require(task['child_id'] == child and (task['day'] == day or ((task.get('plan') or daily_homework(task)) and task['day'] <= day)), 'not_found', 404)
+                    require(task['child_id'] == child, 'not_found', 404)
                     require(type(body.get('expected_version')) is int and body['expected_version'] == task['version'], 'conflict', 409)
                     if role == 'child':
                         require(task['assignment_state'] != 'pending' and task['status'] != 'archived', 'task_not_available', 403)
                     if op == 'update':
-                        task.update(fields(body))
+                        for key in ('created_day', 'storage_day', 'assignment_id', 'assignment_title', 'portion_label'):
+                            require(key not in body or body[key] == task.get(key), 'immutable_task_field', 409)
+                        require(not (set(body) & {'portions', 'plan', 'adjustments', 'adjusted_dates'}), 'immutable_task_field', 409)
+                        updates = planning.metadata(body, task)
+                        if 'exp_award' in updates:
+                            awarded = con.execute('SELECT payload FROM progress.pledge_progress WHERE key=?',
+                                                  ('task:' + child + ':' + task_id,)).fetchone()
+                            require(not awarded or updates['exp_award'] == original_award_points(json.loads(awarded[0])),
+                                    'reward_amount_locked', 409)
+                        current_type = planning.work_type(task)
+                        next_type = updates.get('work_type', current_type)
+                        require(next_type == current_type or (current_type != 'weekly' and next_type != 'weekly'),
+                                'weekly_portion_fixed', 409)
+                        if 'planned_day' in updates and updates['planned_day'] != planning.planned_day(task):
+                            require(task['status'] not in {'done', 'pending_parent'}, 'task_replan_locked', 409)
+                            task.setdefault('adjustments', []).append({'from_day': planning.planned_day(task),
+                                'to_day': updates['planned_day'], 'view_day': day, 'changed_day': planning.today(),
+                                'operation_id': body['operation_id']})
+                        task.update(fields(dict(task, **body)))
+                        task.update(updates)
                     elif op == 'assign':
                         require(body.get('task_kind') in KINDS)
                         task.update(task_kind=body['task_kind'], assignment_state='verified')
                     elif op == 'feedback':
                         status = body.get('status')
-                        allowed = {'done', 'todo', 'archived'} if role == 'parent' else {'pending_parent', 'done', 'help', 'paused'}
+                        allowed = {'done', 'todo', 'archived'} if role == 'parent' else {'pending_parent', 'done', 'todo', 'doing', 'help', 'paused'}
                         require(status in allowed)
+                        already_done = task['status'] == 'done' and status == 'done'
+                        require(not (status == 'archived' and planning.work_type(task) == 'weekly'),
+                                'weekly_portion_required', 409)
+                        if role == 'child' and task['status'] == 'done':
+                            require(task.get('completed_by') == 'child' and task['task_kind'] not in {'paper', 'legacy'}
+                                    and status in {'todo', 'done'}, 'parent_confirmation_locked', 403)
                         require(not (role == 'child' and task['task_kind'] in {'paper', 'legacy'} and status == 'done'),
                                 'parent_confirmation_required', 403)
-                        # 纸笔：孩子待确认 / 家长确认完成前必须至少有 1 张作业照片。
-                        if child == 'child_a' and task['task_kind'] in {'paper', 'legacy'} and (
+                        # Photo requirements are typed; paper still always needs parent confirmation.
+                        if not already_done and planning.photo_required(task) and (
                             (role == 'child' and status == 'pending_parent') or
                             (role == 'parent' and status == 'done')
                         ):
                             require(getattr(self, 'photos', None) is not None, 'storage_unavailable', 503)
-                            require(self.photos.count(day if task.get('plan') else task['day'], child, task_id) >= 1, 'photos_required', 403)
+                            require(self.photos.count(task['day'], child, task_id) >= 1, 'photos_required', 403)
                         if task['task_kind'] in {'paper', 'legacy'}:
                             if role == 'parent' and status == 'done':
                                 require(not task.get('photo_needs_resubmit'), 'photos_resubmit_required', 409)
@@ -307,39 +471,42 @@ class Tasks:
                             note = note.strip()
                             require(len(note) <= 500, 'invalid_help_note')
                             task['help_note'] = note
+                        if 'progress_note' in body:
+                            task.update(planning.metadata({'progress_note': body['progress_note']}))
+                        if status == 'todo' and task['status'] == 'done':
+                            self.change_reward(con, task, child, day, body['operation_id'], undo=True)
                         task['status'] = status
-                        if task.get('plan') or daily_homework(task):
-                            if status == 'done':
-                                task['completed_day'] = day
-                            else:
-                                task.pop('completed_day', None)
+                        if status == 'pending_parent':
+                            task.update(submitted_day=day, submitted_by=role)
+                        if status == 'done':
+                            if not already_done:
+                                task.update(completed_day=day, completed_by=role)
+                                if role == 'parent':
+                                    task['confirmed_day'] = day
+                        else:
+                            task.pop('completed_day', None)
+                            task.pop('completed_by', None)
+                            task.pop('confirmed_day', None)
+                        if status == 'todo':
+                            task.pop('submitted_day', None)
+                            task.pop('submitted_by', None)
                     if op == 'delete':
+                        require(planning.work_type(task) != 'weekly', 'weekly_portion_required', 409)
                         con.execute('DELETE FROM tasks WHERE id=?', (task_id,))
                     else:
                         task['version'] += 1
                         con.execute('UPDATE tasks SET version=?,payload=? WHERE id=?', (task['version'], canonical(task), task_id))
                 if op == 'feedback' and task['status'] == 'done':
-                    is_itinerary = bool(task.get('itinerary')) or str(task_id).startswith('itinerary-')
-                    points = award_points(task, task_id)
-                    award={'kind':'task','child_id':child,'task_id':task_id,'day':day,'points':points,'operation_id':body['operation_id'],'source':'itinerary' if is_itinerary else 'task'}
-                    # Persist the crossing with the award, in the existing payload and transaction.
-                    before = lifetime_exp(con, child)
-                    after = before + points
-                    previous, current = form_for_lifetime(before, child), form_for_lifetime(after, child)
-                    event = {'lifetime_exp': after, 'form_id': current, 'form_name': FORM_NAMES[current],
-                             'form_changed': previous != current}
-                    if previous != current:
-                        event.update(form_from=previous, form_from_name=FORM_NAMES[previous],
-                                     celebrate=('太乐巴戈斯' if child == 'child_a' else '喷火龙')+'变成'+FORM_NAMES[current]+'啦！')
-                    award['form_receipt'] = event
-                    con.execute('INSERT OR IGNORE INTO progress.pledge_progress VALUES(?,?,?)',('task:'+child+':'+task_id,1,canonical(award)))
+                    self.change_reward(con, task, child, day, body['operation_id'])
                 con.execute('INSERT INTO operations VALUES(?,?)', (op_id, request))
                 result = self.pack(con, role, day, child)
-                if op == 'feedback' and task['status'] == 'done':
+                if op == 'feedback' and task['status'] in {'done', 'todo'}:
                     result['reward'] = self.reward_receipt(con, child, task_id, body['operation_id'])
+                if op == 'update' and planning.planning_warning(task):
+                    result['planning_warning'] = planning.planning_warning(task)
             # Exiting the transaction commits before success is sent. Commit failure returns 503.
             return 200, result
-        except Rejected as e:
+        except (Rejected, PhotoRejected, planning.PlanningError) as e:
             return e.code, {'error': e.error}
         except (sqlite3.Error, OSError):
             return 503, {'error': 'storage_unavailable'}
@@ -484,7 +651,9 @@ def handler(root, tasks, lan_ip, pledges=None, photos=None):
                 return
             try:
                 length = int(self.headers.get('Content-Length', '0'))
-                require(0 < length <= 32768 and not self.headers.get('Transfer-Encoding'))
+                # Material-rich tasks accepted on creation must remain editable.
+                limit = 512 * 1024 if path in {PREFIX + 'parent/create', PREFIX + 'parent/update'} else 32768
+                require(0 < length <= limit and not self.headers.get('Transfer-Encoding'))
                 self.connection.settimeout(10)
                 body = json.loads(self.rfile.read(length))
             except (Rejected, ValueError, OSError):

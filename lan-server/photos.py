@@ -37,6 +37,13 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
 
 
+def sent_state(items):
+    """The claim applies only to this exact, nonempty displayed photo set."""
+    sent = bool(items) and all(item.get('teacher_sent') is True for item in items)
+    sent_at = max((item.get('sent_at') or '' for item in items), default='') or None
+    return sent, sent_at if sent else None
+
+
 class Photos:
     def __init__(self, root: Path, tasks_db: Path):
         self.root = Path(root)
@@ -77,6 +84,63 @@ class Photos:
         os.chmod(tmp, 0o600)
         os.replace(tmp, self._meta_path(day, child, task_id))
 
+    def _load_task_meta(self, day, child, task_id):
+        """Read every legacy folder, preserving each image's original file location.
+
+        Subsequent metadata lives at the immutable task day. References to older
+        files and tombstones are copied there; original image bytes are never moved.
+        The sum of folder revisions remains a single optimistic-concurrency token.
+        """
+        anchor = self._load_meta(day, child, task_id)
+        sources = [(day, anchor)]
+        for path in sorted(self.root.glob(f'*/{child}/{task_id}/meta.json')):
+            source_day = path.parts[-4]
+            if (source_day == day or not DAY_RE.fullmatch(source_day)
+                    or not path.resolve().is_relative_to(self.root.resolve())):
+                continue
+            sources.append((source_day, self._load_meta(source_day, child, task_id)))
+        deleted, photos = {}, {}
+        source_meta = dict(sources)
+        other_revisions = sum(int(meta.get('revision') or 0) for d, meta in sources if d != day)
+        for source_day, meta in sources:
+            for item in meta.get('deleted', []):
+                if isinstance(item, dict) and isinstance(item.get('id'), str) and PHOTO_ID.fullmatch(item['id']):
+                    deleted[item['id']] = dict(item, storage_day=item.get('storage_day', source_day))
+        for source_day, meta in sources:
+            for item in meta.get('photos', []):
+                if not isinstance(item, dict):
+                    continue
+                pid = item.get('id')
+                if not isinstance(pid, str) or not PHOTO_ID.fullmatch(pid) or pid in deleted:
+                    continue
+                item = dict(item, storage_day=item.get('storage_day', source_day))
+                require(isinstance(item['storage_day'], str) and DAY_RE.fullmatch(item['storage_day']), 'storage_unavailable', 503)
+                if type(item.get('teacher_sent')) is not bool:
+                    # Imported references must inherit their actual source's old
+                    # flag, never an unrelated flag on the anchor folder.
+                    origin = source_meta.get(item['storage_day'], {})
+                    item['teacher_sent'] = bool(origin.get('teacher_sent'))
+                    item['sent_at'] = origin.get('sent_at') if item['teacher_sent'] else None
+                elif not item['teacher_sent']:
+                    item['sent_at'] = None
+                if pid in photos:
+                    previous = photos[pid]
+                    require(previous.get('sha256') == item.get('sha256') and previous.get('file') == item.get('file'),
+                            'photo_id_conflict', 409)
+                    continue
+                photos[pid] = item
+        combined = dict(anchor, photos=list(photos.values()), deleted=list(deleted.values()),
+                        revision=int(anchor.get('revision') or 0) + other_revisions,
+                        _other_revisions=other_revisions)
+        combined['teacher_sent'], combined['sent_at'] = sent_state(combined['photos'])
+        return combined
+
+    def _save_task_meta(self, day, child, task_id, meta):
+        saved = dict(meta)
+        saved['revision'] = int(saved['revision']) - saved.pop('_other_revisions', 0)
+        saved['teacher_sent'], saved['sent_at'] = sent_state(saved['photos'])
+        self._save_meta(day, child, task_id, saved)
+
     def _lookup_task(self, day, child, task_id):
         try:
             owned = getattr(self._local, 'con', None) is None
@@ -84,17 +148,18 @@ class Photos:
         except sqlite3.Error:
             raise Rejected(503, 'storage_unavailable')
         try:
-            row = con.execute('SELECT payload FROM tasks WHERE id=?', (task_id,)).fetchone()
+            row = con.execute('SELECT day,payload FROM tasks WHERE id=?', (task_id,)).fetchone()
         finally:
             if owned: con.close()
         require(row is not None, 'not_found', 404)
-        task = json.loads(row[0])
+        task = json.loads(row[1])
+        task['day'] = row[0]
         require(task.get('child_id') == child, 'not_found', 404)
-        require(task.get('day') == day or (task.get('plan') and task.get('day') <= day), 'not_found', 404)
         return task
 
     def count(self, day, child, task_id):
-        return len(self._load_meta(day, child, task_id).get('photos') or [])
+        day, child, task_id = self._selection(day, child, task_id)
+        return len(self._load_task_meta(day, child, task_id)['photos'])
 
     def _sniff_ext(self, raw: bytes):
         if raw.startswith(JPEG_MAGIC):
@@ -115,25 +180,33 @@ class Photos:
                     'task_kind': 'paper', 'status': 'archived', 'version': 0, 'photo_orphan': True}
 
     def library(self, day, child):
-        counts, posts = {}, []
+        counts, posts, seen = {}, [], set()
         for path in sorted(self.root.glob('*/*/*/meta.json')):
             if not path.resolve().is_relative_to(self.root.resolve()): continue
             d, c, task_id = path.parts[-4:-1]
             if not DAY_RE.fullmatch(d) or c not in CHILDREN or not PHOTO_ID.fullmatch(task_id): continue
             if child != 'all' and c != child: continue
-            meta = self._load_meta(d, c, task_id)
-            n = len(meta['photos'])
-            if not n: continue
-            counts[d] = counts.get(d, 0) + n
-            if d == day:
-                task = dict(self._parent_task(d, c, task_id))
-                task['planned_day'], task['day'] = task['day'], d
-                posts.append({'task': task, 'pack': self._pack('parent', d, c, task_id, meta)})
+            if (c, task_id) in seen: continue
+            seen.add((c, task_id))
+            anchor, _, _ = self._selection(d, c, task_id)
+            meta = self._load_task_meta(anchor, c, task_id)
+            for photo in meta['photos']:
+                source_day = photo['storage_day']
+                counts[source_day] = counts.get(source_day, 0) + 1
+            displayed = [photo for photo in meta['photos'] if photo['storage_day'] == day]
+            if displayed:
+                task = dict(self._parent_task(anchor, c, task_id))
+                task['storage_day'] = anchor
+                task.setdefault('planned_day', task['day'])
+                task['day'] = day
+                pack = self._pack('parent', anchor, c, task_id, dict(meta, photos=displayed))
+                pack.update(day=day, storage_day=anchor)
+                posts.append({'task': task, 'pack': pack})
         return {'dataset': 'lan', 'day': day, 'child_id': child,
                 'days': [{'day': d, 'count': counts[d]} for d in sorted(counts, reverse=True)], 'posts': posts}
 
     def _pack(self, role, day, child, task_id, meta=None):
-        meta = meta or self._load_meta(day, child, task_id)
+        meta = meta or self._load_task_meta(day, child, task_id)
         photos = []
         for item in meta.get('photos') or []:
             pid = item.get('id')
@@ -146,9 +219,13 @@ class Photos:
                 'width': item.get('width') or 0,
                 'height': item.get('height') or 0,
                 'created_at': item.get('created_at'),
+                'storage_day': item.get('storage_day', day),
+                'teacher_sent': item.get('teacher_sent') is True,
+                'sent_at': item.get('sent_at') if item.get('teacher_sent') is True else None,
                 'url': f'/lan/family/{role}/photo?day={day}&child={child}&task={task_id}&id={pid}',
             })
         task = self._parent_task(day, child, task_id) if role == 'parent' else self._lookup_task(day, child, task_id)
+        teacher_sent, sent_at = sent_state(photos)
         return {
             'editable': task.get('status') not in {'done', 'archived'} and task.get('assignment_state') != 'pending',
             'task_status': task.get('status'),
@@ -157,8 +234,8 @@ class Photos:
             'day': day,
             'child_id': child,
             'revision': int(meta.get('revision') or 0),
-            'teacher_sent': bool(meta.get('teacher_sent')),
-            'sent_at': meta.get('sent_at'),
+            'teacher_sent': teacher_sent,
+            'sent_at': sent_at,
             'photos': photos,
         }
 
@@ -168,12 +245,11 @@ class Photos:
         require(isinstance(task_id, str) and PHOTO_ID.fullmatch(task_id))
         if self.tasks_db.exists():
             with sqlite3.connect(self.tasks_db.resolve().as_uri()+'?mode=ro', uri=True) as con:
-                row = con.execute('SELECT payload FROM tasks WHERE id=?', (task_id,)).fetchone()
+                row = con.execute('SELECT day,payload FROM tasks WHERE id=?', (task_id,)).fetchone()
             if row:
-                task = json.loads(row[0])
+                task = json.loads(row[1])
                 require(task.get('child_id') == child, 'not_found', 404)
-                if not task.get('plan') and task.get('day', day) <= day:
-                    day = task['day']
+                day = row[0]
         return day, child, task_id
 
     def _changed(self, task):
@@ -268,12 +344,13 @@ class Photos:
                 day, child, task_id = self._selection(q['day'][0], q['child'][0], q['task'][0])
                 pid = q['id'][0]
                 require(PHOTO_ID.fullmatch(pid), 'invalid_input')
-                meta = self._load_meta(day, child, task_id)
+                meta = self._load_task_meta(day, child, task_id)
                 item = next((p for p in meta.get('photos') or [] if p.get('id') == pid), None)
                 require(item, 'not_found', 404)
                 file_name = item.get('file') or (pid + '.jpg')
-                target = (self._task_dir(day, child, task_id) / file_name).resolve()
-                require(target.is_relative_to(self._task_dir(day, child, task_id).resolve()) and target.is_file(),
+                source_dir = self._task_dir(item.get('storage_day', day), child, task_id)
+                target = (source_dir / file_name).resolve()
+                require(target.is_relative_to(source_dir.resolve()) and target.is_file(),
                         'not_found', 404)
                 data = target.read_bytes()
                 ctype = 'image/jpeg'
@@ -294,13 +371,28 @@ class Photos:
                 require(type(body.get('value')) is bool)
                 require(type(body.get('expected_revision')) is int)
                 require(isinstance(body.get('operation_id'), str) and PHOTO_ID.fullmatch(body['operation_id']))
-                meta = self._load_meta(day, child, task_id)
+                meta = self._load_task_meta(day, child, task_id)
                 require(meta['revision'] == body['expected_revision'], 'photo_conflict', 409)
+                by_id = {photo['id']: photo for photo in meta['photos']}
+                if 'photo_ids' in body:
+                    photo_ids = body['photo_ids']
+                    require(isinstance(photo_ids, list) and photo_ids and all(
+                        isinstance(pid, str) and PHOTO_ID.fullmatch(pid) for pid in photo_ids), 'invalid_photo_ids')
+                    require(len(set(photo_ids)) == len(photo_ids), 'invalid_photo_ids')
+                    require(set(photo_ids) <= set(by_id), 'photo_conflict', 409)
+                else:
+                    # An old date card has a determinable subset. A task detail
+                    # from another view day must refresh with explicit IDs.
+                    photo_ids = [photo['id'] for photo in meta['photos'] if photo['storage_day'] == body['day']]
+                    require(photo_ids, 'photo_scope_empty', 409)
+                marked_at = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z' if body['value'] else None
+                for pid in photo_ids:
+                    by_id[pid]['teacher_sent'] = body['value']
+                    by_id[pid]['sent_at'] = marked_at
                 meta['revision'] = int(meta['revision']) + 1
-                meta['teacher_sent'] = body['value']
-                meta['sent_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z' if body['value'] else None
-                self._save_meta(day, child, task_id, meta)
-                return 200, self._pack(role, day, child, task_id, meta)
+                self._save_task_meta(day, child, task_id, meta)
+                selected = dict(meta, photos=[by_id[pid] for pid in photo_ids])
+                return 200, dict(self._pack(role, day, child, task_id, selected), scope_photo_ids=photo_ids)
 
             if op == 'photos/delete':
                 require(method == 'POST' and role in {'child', 'parent'}, 'operation_not_available', 405)
@@ -310,7 +402,7 @@ class Photos:
                 if role == 'child': self._editable(task)
                 pid = body.get('photo_id')
                 require(isinstance(pid, str) and PHOTO_ID.fullmatch(pid))
-                meta = self._load_meta(day, child, task_id)
+                meta = self._load_task_meta(day, child, task_id)
                 # Tombstones preserve original bytes and make retries idempotent.
                 if any(p['id'] == pid for p in meta.get('deleted', [])):
                     return 200, self._pack(role, day, child, task_id, meta)
@@ -329,7 +421,7 @@ class Photos:
                                                 (task['version'], canonical(task), task_id))
                     else:
                         self._changed(task)
-                self._save_meta(day, child, task_id, meta)
+                self._save_task_meta(day, child, task_id, meta)
                 return 200, self._pack(role, day, child, task_id, meta)
 
             if op != 'photos':
@@ -358,7 +450,7 @@ class Photos:
                 raise Rejected(400, 'unsupported_image')
             ext, _ctype = self._sniff_ext(raw)
             sha = hashlib.sha256(raw).hexdigest()
-            meta = self._load_meta(day, child, task_id)
+            meta = self._load_task_meta(day, child, task_id)
             existing = next((p for p in meta['photos'] if p.get('id') == pid), None)
             if existing:
                 require(existing.get('sha256') == sha, 'photo_conflict', 409)
@@ -393,13 +485,16 @@ class Photos:
                 'height': 0,
                 'created_at': created,
                 'file': file_name,
+                'storage_day': day,
+                'teacher_sent': False,
+                'sent_at': None,
             })
             meta['revision'] = int(meta.get('revision') or 0) + 1
             meta['teacher_sent'] = False
             meta['sent_at'] = None
             self._changed(task)
             try:
-                self._save_meta(day, child, task_id, meta)
+                self._save_task_meta(day, child, task_id, meta)
             except OSError:
                 try:
                     target.unlink(missing_ok=True)

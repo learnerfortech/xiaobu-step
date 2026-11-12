@@ -1,8 +1,8 @@
 # 小步 step（xiaobu-step）
 
-**作业管理系统 / homework tracker（开源）** — 两娃家庭自用：孩子端点作业清单，家长端看完成与检查（待确认／未完成／已完成）；纸笔作业拍照后由家长确认。
+**作业管理系统 / homework tracker（开源）** — 两娃家庭自用：孩子端点作业清单，家长端看完成与检查（待确认／未完成／已完成）；需要检查的纸笔作业由家长确认，照片按任务要求提交。
 
-Open-source local family homework management for two kids: child checklist + parent review (pending confirm / incomplete / done), with photo proof for paper work.
+Open-source local family homework management for two kids: child checklist + parent review (pending confirm / incomplete / done), with per-task photo requirements for paper work.
 
 > 当前主要在家里局域网使用；本仓库开源的是前端与局域网服务代码，**不含**真实作业库、孩子照片与课程材料。
 
@@ -53,6 +53,16 @@ python3 lan-server/server.py \
 `http://<你的局域网IP>:8766/index.html?transport=lan`
 
 孩子入口常见为 `#/jared`、`#/joey`，家长为 `#/parent`。
+
+## 任务安排与完成
+
+- 家长新建学校作业，或把周作业的明确总量拆成固定小份。每份可单独安排日期；暂未安排的份数仍保留在周概览里。
+- 录入日、计划日期、老师真实截止日分别记录。没有老师截止日就留空；调整计划不会改变截止日。日期由家长修改，孩子可以记录部分进度或求助。
+- 周作业跨天仍保留原份数和进度，不标为顺延。完成或提交检查后，当前清单保留勾选和划线，并区分“待家长确认”和“已完成”。整组完成后只在相关日期显示，原记录仍可查。
+- 每份只获得一次经验。需要检查的纸笔作业在家长确认后发放；误点撤销会撤回该份经验，再完成时恢复原额。一旦发过经验，该份金额不再调整。
+- 老师要求置顶，题目、讲解、范文、答案和音频按对应任务查看。外部网站的进度由孩子回来记录，当前没有自动同步。
+
+旧任务读取时保留原 ID、照片和已有进度，不自动重新拆分或补造日期。以上说明源码中的规则；家中设备是否已使用这些改动，需核对设备正在运行的代码。
 
 ## 安全、隐私与授权
 

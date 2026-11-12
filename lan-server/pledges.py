@@ -83,6 +83,8 @@ class Pledges:
         days={ (start+datetime.timedelta(days=i)).isoformat():{'task_exp':0,'task_count':0,'pledge_exp':0,'pledge_rated':0,'rated':False} for i in range(7) }
         for (payload,) in c.execute('SELECT payload FROM progress.pledge_progress WHERE key LIKE ?',('task:'+child+':%',)):
             record=json.loads(payload)
+            if record.get('reversed'):
+                continue
             if record['day'] in days:
                 days[record['day']]['task_exp']+=record['points'];days[record['day']]['task_count']+=1;days[record['day']]['rated']=True
         if child=='child_a':

@@ -147,7 +147,7 @@ async function countUploaded(task) {
   return r.data.photos.length;
 }
 function needsHomeworkPhoto(task) {
-  return task && task.child_id === 'child_a' && ['paper', 'legacy'].includes(task.task_kind);
+  return task && window.TaskPlanning.needsPhoto(task);
 }
 /** 纸笔完成前：至少 1 张已上传照片。缺照片则引导去拍。返回是否可继续完成。 */
 async function requireBeforeDone(task) {

@@ -496,3 +496,130 @@ button.p-tile[aria-pressed="true"] { border-color:currentColor; box-shadow:0 0 0
 /* Jared homework doors visible */
 .jared-group-cards.j-home-flow{display:flex !important;flex-direction:column;gap:14px;width:min(100%,860px);margin:8px 0 12px}
 .jared .j-flow-card{width:100%}
+
+/* Child task status and teacher instructions stay readable in every state. */
+.c-screen .task-title-content{display:inline-flex;align-items:baseline;gap:8px;max-width:100%;min-width:0}
+.c-screen .task-title-copy{min-width:0;overflow-wrap:anywhere}
+.c-screen .task-title-content.is-complete .task-title-copy{text-decoration-line:line-through;text-decoration-thickness:2px}
+.c-screen .task-title-check{display:inline-flex;align-self:flex-start;align-items:center;flex:none;color:var(--ts-text-primary)}
+.c-screen .task-title-check .ic{width:1em;height:1em;stroke-width:3}
+.jared .rcard.quiet .rcard-title{color:var(--ts-text-primary)}
+.jared .t-status{padding:14px 16px;color:var(--ts-text-primary);line-height:1.4}
+.c-screen .task-requirement{width:100%;padding:14px 16px;border:2px solid var(--ts-sun-300);border-radius:var(--ts-radius-sm);background:var(--ts-sun-50);color:var(--ts-text-primary);text-align:left}
+.c-screen .task-requirement h2{margin:0 0 8px;font:800 18px/1.4 var(--ts-font-cn)}
+.c-screen .task-requirement .req-text{margin:0;padding:0;background:none;border-radius:0;font:600 20px/1.65 var(--ts-font-cn);white-space:pre-wrap;overflow-wrap:anywhere}
+.joey .j-task-instructions{align-items:stretch;text-align:left}
+.joey .j-task-instructions .tcard-title{font-size:24px}
+.joey .j-task-instructions>p{margin:0}
+.joey .j-task-instructions [data-testid=task-exp]{font-size:18px}
+.joey .task-completion-status{font-weight:800;color:var(--ts-text-primary)}
+
+/* Keep material and other light buttons legible, with room for long labels. */
+:is(.c-screen.jared,.c-screen.joey) .c-btn{min-width:0;max-width:100%;padding-block:14px;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+:is(.c-screen.jared,.c-screen.joey) .c-btn>span{min-width:0;overflow-wrap:anywhere}
+:is(.c-screen.jared,.c-screen.joey) .c-btn:not(.primary):not(.camera){color:var(--ts-text-primary);text-shadow:none}
+:is(.c-screen.jared,.c-screen.joey) .c-btn.story{background:linear-gradient(180deg,var(--ts-coral-50),var(--ts-coral-300))}
+:is(.c-screen.jared,.c-screen.joey) .c-btn:not(.primary):not(.camera):not(.story):not(.sun):not(.ghost){background:var(--ts-bg-surface);box-shadow:var(--ts-raised-white)}
+:is(.c-screen.jared,.c-screen.joey) .c-mini{color:var(--ts-text-primary);line-height:1.4;white-space:normal;overflow-wrap:anywhere}
+.joey .j-flow-copy strong,.joey .j-flow-copy>span{overflow-wrap:anywhere}
+@media(max-width:600px){
+  .jared .rcard{flex-wrap:wrap}
+  .jared .rcard-main{flex-basis:100%;display:grid;grid-template-columns:52px minmax(0,1fr)}
+  .jared .rcard-title{display:block;overflow:visible;-webkit-line-clamp:unset}
+  .jared .rcard-cta{grid-column:2;justify-self:start;max-width:100%;white-space:normal;line-height:1.4}
+  .jared .rcard>.c-mini{margin:0 0 0 auto}
+  .joey .j-itinerary{flex-wrap:wrap}
+  .joey .j-itinerary>span{flex:1;min-width:0}
+  .joey .j-itinerary small{flex-basis:100%;margin-left:34px}
+}
+
+/* Fixed weekly portions share one total, while each day's plan stays small. */
+.planning-meta,.planning-progress,.planning-note{margin:8px 0;line-height:1.6;overflow-wrap:anywhere;color:#263e35}
+.planning-meta{font-size:16px}
+.planning-progress{padding:10px 12px;background:#edf5ef;border-radius:10px;white-space:pre-wrap}
+.planning-note{padding:12px;background:#fff3d8;border:1px solid #d9b46a;border-radius:10px}
+.task-materials{display:grid;gap:12px;width:100%;min-width:0}
+.task-materials>.c-btn,.task-materials>.p-btn,.task-answers .c-btn{width:100%;justify-content:flex-start;text-align:left}
+.task-material h3{margin:0 0 8px;font-size:18px}
+.task-answers{padding:12px;border:1px solid #b4c4bb;border-radius:12px;background:#fff}
+.task-answers>summary{min-height:44px;cursor:pointer;display:flex;align-items:center;font-weight:700;color:#263e35}
+.task-answers>summary::before{content:'▸';margin-right:8px}
+.task-answers[open]>summary::before{content:'▾'}
+.task-answers[open]>summary{margin-bottom:8px}
+.portion-check{display:flex;align-items:center;gap:12px;min-height:48px;margin:8px 0;padding:10px;border:1px solid #b4c4bb;border-radius:10px;color:#263e35;background:#fff}
+.portion-check input{width:24px;height:24px;flex:none;accent-color:#355b45}
+.portion-check>span:nth-child(2){flex:1;overflow-wrap:anywhere}
+.week-overview,.adjusted-notes{width:min(100%,860px);margin:12px 0;padding:16px 18px;border-radius:16px;border:1px solid #b4c4bb;background:#fff;color:#263e35}
+.week-overview>summary,.p-week-overview>summary{cursor:pointer;min-height:44px;font-size:18px;font-weight:800;line-height:1.5}
+.week-assignment+.week-assignment,.p-week-assignment+.p-week-assignment{margin-top:20px;padding-top:16px;border-top:1px solid #d0d9d3}
+.week-assignment h3,.p-week-assignment h3{margin:8px 0}
+.week-portion{padding:12px 0;border-bottom:1px solid #e1e7e3;line-height:1.5}
+.week-portion p{margin:6px 0}
+.week-portion .c-mini{min-height:44px}
+.adjusted-notes p{margin:5px 0;line-height:1.6;overflow-wrap:anywhere}
+.p-week-overview{grid-column:1/-1}
+.p-week-portion{padding:8px 0;border-bottom:1px solid #e2e5e8}
+.p-week-portion>p{margin:4px 12px 8px}
+.p-week-assignment>.p-btn{margin-top:12px}
+.p-planning-fields{display:grid;gap:14px;padding-top:14px;border-top:1px solid #d0d5dd}
+.p-material-editor{display:grid;gap:12px;margin:12px 0}
+.p-material-row{display:grid;gap:10px;padding:12px;border:1px solid #d0d5dd;border-radius:12px;background:#f8faf9}
+.p-material-row>.p-btn{justify-self:start}
+.p-page-range{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.p-page-range>*{flex:1;min-width:100px}
+.p-portion-editor{display:grid;gap:12px;margin-top:12px}
+.p-portion-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr) minmax(64px,.5fr);gap:10px;padding:12px;border:1px solid #d0d5dd;border-radius:12px}
+.p-planning-fields input,.p-material-row input,.p-portion-row input,.p-schedule-row input{min-width:0;width:100%}
+.p-week-create h3{margin:0 0 12px}
+.p-schedule-row{display:grid;gap:10px;padding:14px 0;border-top:1px solid #d0d5dd}
+.p-schedule-row .p-chip{justify-self:start}
+.p-schedule-row>p{margin:0}
+.p-teacher-requirement{background:#fff3d8;border:1px solid #d9b46a;border-radius:12px;padding:12px}
+.p-teacher-requirement h3{margin:0 0 8px}
+.p-teacher-requirement p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
+.dlg[data-audience=child] .planning-meta{font-size:16px}
+.dlg[data-audience=child] .c-mini{min-height:44px;color:#263e35}
+@media(max-width:600px){
+  .p-portion-row{grid-template-columns:minmax(0,1fr) minmax(70px,.55fr)}
+  .p-portion-row>.p-field:first-child{grid-column:1/-1}
+  .p-page-range{align-items:stretch}
+  .p-page-range>*{min-width:0}
+  .week-overview,.adjusted-notes{padding:14px;max-width:100%}
+  .p-week-overview>summary{font-size:17px}
+  .p-planning-fields .p-switch{align-items:flex-start}
+}
+
+/* Local grouped materials and pale action buttons must remain readable. */
+.material-group .c-btn, .task-materials .c-btn.story, .c-mini, .c-link { color:#173e35; }
+.task-title-copy { overflow-wrap:anywhere; }
+.week-overview > summary { color:#173e35; }
+
+.week-summary { margin:16px 0; padding:16px; border-radius:16px; background:#edf5ef; color:#173e35; border:1px solid #9db5a9; }
+.week-summary h2 {margin:0 0 8px;font-size:22px;}
+.task-day-section.weekly {border-left:4px solid #648776;padding-left:12px;}
+
+/* Today's focus uses the existing cards; totals and review states stay explicit. */
+.c-screen .task-day-count{margin:0;font:700 17px/1.6 var(--ts-font-cn);color:#263e35;overflow-wrap:anywhere}
+.c-screen .task-resume{display:grid;gap:10px;width:min(100%,860px);padding:18px;border:2px solid #648776;border-radius:22px;background:#edf5ef;color:#173e35}
+.c-screen .task-resume h2,.c-screen .task-day-section h2,.c-screen .j-reading h2{margin:0 0 6px;font:800 22px/1.4 var(--ts-font-cn)}
+.c-screen .task-resume>strong{font:800 21px/1.5 var(--ts-font-cn);overflow-wrap:anywhere}
+.c-screen .task-resume>p{margin:0}
+.c-screen .task-resume>.c-btn{justify-self:start}
+.c-screen .task-day-section+.task-day-section{margin-top:24px}
+.c-screen .j-reading{margin-top:18px}
+.c-screen .needs-plan>summary,.c-screen .joey-needs-plan>summary{min-height:48px;overflow-wrap:anywhere}
+.c-screen .needs-plan>p{line-height:1.6;overflow-wrap:anywhere}
+.c-screen .task-first-step{width:100%;padding:12px 14px;border-left:4px solid #648776;border-radius:10px;background:#edf5ef;color:#263e35}
+.c-screen .task-first-step h2{margin:0 0 6px;font:800 18px/1.4 var(--ts-font-cn)}
+.c-screen .task-first-step p{margin:0;overflow-wrap:anywhere}
+.jared .rcard-cta{line-height:1.4;overflow-wrap:anywhere}
+.jared .rcard-meta{line-height:1.5}
+.jared .c-alldone{flex-wrap:wrap}
+.jared .c-alldone>p{flex-basis:100%;margin:0 0 6px;line-height:1.6}
+:is(.c-screen.jared,.c-screen.joey,.dlg[data-audience=child]) .c-btn.primary{background:linear-gradient(180deg,#5FE27F 0%,#2CC55A 70%);color:#0b3d1c;text-shadow:none}
+.jared .rcard-cta:is(.todo,.doing,.paused){background:#2CC55A;color:#0b3d1c}
+.p-row [data-testid=help-snippet]{line-height:1.5;overflow-wrap:anywhere;color:#263e35}
+@media(max-width:600px){
+  .c-screen .task-resume{padding:14px}
+  .c-screen .task-resume>.c-btn{width:100%}
+}

@@ -99,12 +99,15 @@ function receipt(reward,child){
  if(!valid){
   title='任务已保存，奖励还没核对';
   explanation='回首页刷新进度，确认后再看。';
+ }else if(reward.reason==='restored'&&reward.points>0){
+  title='已恢复 '+reward.points+' 经验';
+  explanation='恢复这一份原有的奖励。';
  }else if(reward.points>0){
   title='＋'+reward.points+' 经验';
   explanation='本次奖励已记入家里共享库';
- }else if(reward.reason==='already_awarded'){
-  title='已经记过了';
-  explanation='这次不加分';
+ }else if(['already_awarded','replayed'].includes(reward.reason)){
+  title='这一份已经记下';
+  explanation='完成记录和原有奖励都保留。';
  }else{
   title='这次不加分';
   explanation='这次操作不计奖励';

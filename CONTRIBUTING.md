@@ -31,6 +31,8 @@ Do not describe code as tested, deployed, or production-ready unless that exact 
 
 ## Development checks
 
-The repository's GitHub Actions workflow currently checks Python and JavaScript syntax. These checks are not a substitute for running the app on a real device or testing the task, photo, and confirmation flows.
+The repository's GitHub Actions workflow checks Python and JavaScript syntax, task/import behavior, frontend save and UI control logic, and an HTTP task lifecycle using temporary synthetic data. The HTTP tests use the production handler and LAN adapter; the Node UI tests use DOM stubs and do not run a browser.
+
+Run `python -m unittest discover -s tests -v`, `node --test tests/test_task*.cjs`, and `python tests/browser_task_planning.py --http-only` for these behavior checks. Optional browser acceptance is `python tests/browser_task_planning.py` when Python Playwright and Chromium are available. Automated checks do not replace testing task, photo, and confirmation flows on a real device.
 
 When changing runtime behavior, explain the manual test steps and the device/browser used.

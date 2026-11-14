@@ -24,11 +24,31 @@ const log = [];
 let root = null, tab = 'today', who = 'all', photoInfo = {}, content = {}, showArchived = false, picked = new Set();
 let statusFilters = {}, photoRequest = 0, albumRequest = 0, album = { key: null };
 const otherTasksOpen = {};
-const requiresPhoto = t => t.child_id === 'child_a' && paperish(t);
+const weekOpen = {};
+const planningOpen = {};
+const requiresPhoto = t => window.TaskPlanning.needsPhoto(t);
 const chip = s => h('span.p-chip.' + (TONE[s] || ''), {}, ST[s] || s);
 const needsKind = t => t.task_kind === 'legacy' || !t.task_kind || t.assignment_state !== 'verified';
-const paperish = t => ['paper', 'legacy'].includes(t.task_kind);
+const paperish = window.TaskPlanning.paper;
 const hasPhotos = t => !!(photoInfo[t.id] && photoInfo[t.id].photos && photoInfo[t.id].photos.length);
+const needsPlanning = t => window.TaskPlanning.needsPlanning(t, today());
+const needsResponse = t => ['help', 'pending_parent'].includes(t.status);
+function childTasks(c, st = S.get('parent', c)) {
+  const tasks = new Map();
+  for (const t of [...(st.tasks || []), ...(st.week || [])]) {
+    if (t.child_id === c && !tasks.has(t.id)) tasks.set(t.id, t);
+  }
+  return [...tasks.values()];
+}
+function todayTasks(c, st = S.get('parent', c)) {
+  const day = st.day || today();
+  const dailyIds = new Set((st.tasks || []).map(t => t.id));
+  return childTasks(c, st).filter(t => t.status !== 'archived' &&
+    // Match the server's review queue: a known later submission is not part
+    // of an earlier date's actions, even when the week overview includes it.
+    (t.status !== 'pending_parent' || !t.submitted_day || t.submitted_day <= day) &&
+    (needsResponse(t) || (dailyIds.has(t.id) && !needsPlanning(t))));
+}
 
 async function loadAll() {
   await Promise.all(KIDS.map(c => S.load('parent', c)));
@@ -38,7 +58,7 @@ async function loadAll() {
 async function refreshPhotos() {
   if (!['mock', 'lan'].includes(C.TRANSPORT)) return;
   const token = ++photoRequest, day = today(), next = {};
-  const tasks = KIDS.flatMap(c => S.get('parent', c).tasks.filter(t => paperish(t) && t.status !== 'archived'));
+  const tasks = KIDS.flatMap(c => childTasks(c).filter(t => paperish(t) && t.status !== 'archived'));
   await Promise.all(tasks.map(async t => {
     const r = await PhotoAdapter.list('parent', { day: t.day, child_id: t.child_id }, t.id);
     next[t.id] = r.ok ? r.data : null;
@@ -86,7 +106,7 @@ function todayTab() {
   if (C.TRANSPORT === 'lan') out.push(h('section.p-day-summary', { 'aria-label': '今日任务摘要', 'data-testid': 'parent-summary' }, ...kids.map(c => {
     const st = S.get('parent', c);
     if (st.status !== 'ok') return h('p.p-summary-row', {}, h('strong', {}, NAME(c)), h('span', { role: 'status' }, st.status === 'error' ? '读取失败' : '读取中…'));
-    const live = st.tasks.filter(t => t.status !== 'archived'), count = status => live.filter(t => t.status === status).length;
+    const live = todayTasks(c, st), count = status => live.filter(t => t.status === status).length;
     return h('div.p-summary-row', {}, h('strong', {}, NAME(c)), h('span', {}, '完成 ' + count('done')),
       h('button.p-summary-wait', { type: 'button', 'data-testid': 'summary-wait-' + c, 'aria-pressed': String(statusFilters[c] === 'pending_parent'), onclick: () => toggleStatusFilter(c, 'pending_parent') }, '待确认 ' + count('pending_parent')),
       h('span', {}, '求助 ' + count('help')));
@@ -94,12 +114,15 @@ function todayTab() {
   const retry = Object.values(S.pending).filter(op => op.state === 'unknown');
   if (retry.length) out.push(h('div.p-alert', { 'data-testid': 'parent-retry-bar' }, h('span', {}, `未确认保存 ${retry.length}`),
     h('button.p-btn', { type: 'button', 'data-testid': 'parent-retry', onclick: async () => { for (const op of retry) { const r = await S.retry(op.key); report(r, '重试'); } } }, icon('refresh'), '重试')));
-  for (const c of kids) out.push(childBlock(c));
+  for (const c of kids) {
+    out.push(childBlock(c));
+    if (C.TRANSPORT === 'lan') out.push(weekOverview(c));
+  }
   return out;
 }
 function toggleStatusFilter(c, status) {
   statusFilters[c] = statusFilters[c] === status ? null : status;
-  S.get('parent', c).tasks.forEach(t => picked.delete(t.id));
+  childTasks(c).forEach(t => picked.delete(t.id));
   render();
 }
 function childBlock(c) {
@@ -108,7 +131,8 @@ function childBlock(c) {
   if (st.status === 'error') return h('section.p-card', { 'data-testid': 'parent-error-' + c }, head,
     h('div.p-alert', {}, h('span', {}, '读取失败'), h('button.p-btn', { type: 'button', onclick: () => S.load('parent', c).then(render) }, icon('refresh'), '重试')));
   if (st.status !== 'ok') return h('section.p-card', {}, head, h('div.spinner.sm', { role: 'status', 'aria-label': '加载中' }));
-  const live = st.tasks.filter(t => t.status !== 'archived');
+  const live = todayTasks(c, st);
+  const toPlan = childTasks(c, st).filter(needsPlanning);
   const filter = statusFilters[c] || null;
   const shown = live.filter(t => !filter || t.status === filter);
   const n = s => live.filter(t => t.status === s).length;
@@ -119,11 +143,16 @@ function childBlock(c) {
   const blocks = [];
   if (filter) blocks.push(h('div.p-filter-note', { role: 'status' }, '只看' + ST[filter] + ' · ' + shown.length + ' 项', h('button.p-btn', { type: 'button', 'data-testid': 'clear-filter-' + c, onclick: () => { delete statusFilters[c]; render(); } }, '查看全部')));
   if (!live.length) blocks.push(h('p.p-empty', { 'data-testid': 'parent-empty' }, '今天没有任务'));
+  const responses = [];
+  const help = shown.filter(t => t.status === 'help');
+  if (help.length) responses.push(h('section.p-group.help', { 'aria-label': '求助', 'data-testid': 'help-tasks-' + c },
+    h('div.p-group-head', {}, chip('help'), h('span.p-count', {}, String(help.length))),
+    h('ul.p-rows', {}, ...help.map(t => h('li.p-row-li', {}, row(t))))));
   /* 待确认：勾选 + 全选 + 确认完成（Khan Kids Assign） */
   const waiting = shown.filter(t => t.status === 'pending_parent');
   if (waiting.length) {
     const all = waiting.every(t => picked.has(t.id));
-    blocks.push(h('section.p-group.wait', { 'aria-label': '待确认' },
+    responses.push(h('section.p-group.wait', { 'aria-label': '待确认', 'data-testid': 'pending-tasks-' + c },
       h('div.p-group-head', {}, chip('pending_parent'), h('span.p-count', {}, String(waiting.length)),
         h('label.p-check-all', {}, h('input', { type: 'checkbox', checked: all, onchange: e => { waiting.forEach(t => e.target.checked ? picked.add(t.id) : picked.delete(t.id)); render(); } }), '全选')),
       h('ul.p-rows', {}, ...waiting.map(t => h('li.p-row-li', {},
@@ -145,19 +174,25 @@ function childBlock(c) {
         } },
         icon('check'), `确认完成（${waiting.filter(t => picked.has(t.id) && (!requiresPhoto(t) || hasPhotos(t))).length}）`)));
   }
-  /* 家里入口：待确认保持展开；其余任务归入一个默认收起的分组。 */
+  if (responses.length) blocks.push(h('section', { 'aria-label': '需要我处理', 'data-testid': 'response-tasks-' + c },
+    h('h3.p-sub-h', {}, '需要我处理'), ...responses));
+  if (toPlan.length && !filter) blocks.push(h('details.p-group', { 'data-testid': 'replan-tasks-' + c, open: !!planningOpen[c], ontoggle: e => { if (e.target.isConnected) planningOpen[c] = e.target.open; } },
+    h('summary.p-group-head', {}, '待重新安排', h('span.p-count', {}, String(toPlan.length))),
+    h('p.p-muted', {}, '这些周作业还没安排，或原计划已过；不计入今天要做的份额。求助仍在上方处理。'),
+    h('ul.p-rows', {}, ...toPlan.map(t => h('li.p-row-li', {}, row(t))))));
+  /* 求助与待确认保持展开；其余当天任务归入一个默认收起的分组。 */
   const others = [];
-  for (const s of GROUPS.filter(s => s !== 'pending_parent')) {
+  for (const s of GROUPS.filter(s => !['help', 'pending_parent'].includes(s))) {
     const rows = shown.filter(t => t.status === s);
     if (!rows.length) continue;
     others.push(h('section.p-group', { 'aria-label': ST[s] }, h('div.p-group-head', {}, chip(s), h('span.p-count', {}, String(rows.length))), h('ul.p-rows', {}, ...rows.map(t => h('li.p-row-li', {}, row(t))))));
   }
-  const arch = st.tasks.filter(t => t.status === 'archived');
+  const arch = (st.tasks || []).filter(t => t.child_id === c && t.status === 'archived');
   if (C.TRANSPORT === 'lan') {
     if (arch.length && !filter) others.push(h('section.p-group', { 'aria-label': ST.archived }, h('div.p-group-head', {}, chip('archived'), h('span.p-count', {}, String(arch.length))), h('ul.p-rows', {}, ...arch.map(t => h('li.p-row-li', {}, row(t))))));
     if (filter) blocks.push(...others);
     else if (others.length) blocks.push(h('details.p-group.p-other-tasks', { 'data-testid': 'other-tasks-' + c, open: !!otherTasksOpen[c], ontoggle: e => { if (e.target.isConnected) otherTasksOpen[c] = e.target.open; } },
-      h('summary.p-group-head', {}, '其他任务', h('span.p-count', {}, String(st.tasks.filter(t => t.status !== 'pending_parent').length))), ...others));
+      h('summary.p-group-head', {}, '其他任务', h('span.p-count', {}, String(live.filter(t => !needsResponse(t)).length + arch.length))), ...others));
   } else {
     blocks.push(...others);
     if (arch.length && !filter) blocks.push(h('details.p-group', { open: showArchived, ontoggle: e => showArchived = e.target.open }, h('summary.p-group-head', {}, chip('archived'), h('span.p-count', {}, String(arch.length))),
@@ -173,9 +208,96 @@ function row(t) {
   else if (requiresPhoto(t) && t.status === 'pending_parent') flags.push(h('span.p-flag', { 'data-testid': 'photo-missing' }, '缺照片'));
   const rec = (content[t.child_id] || []).find(r => r.payload.task_id === t.id && r.payload.review === 'pending');
   if (rec) flags.push(h('span.p-flag', {}, '内容待核验'));
-  return h('button.p-row', { type: 'button', 'data-testid': 'p-row', onclick: () => detail(t) },
-    h('span.p-kind', { 'aria-hidden': 'true' }, icon(kindOf(t).icon)), h('span.p-row-main', {}, h('span.p-row-title', {}, t.title), flags.length ? h('span.p-row-flags', {}, ...flags) : null),
+  if (needsPlanning(t)) flags.push(h('span.p-flag', { 'data-testid': 'needs-planning' }, '待重新安排' + (t.planned_day ? ' · 原计划 ' + t.planned_day : ' · 未排日期')));
+  const note = t.status === 'help' && t.help_note ? t.help_note.trim().replace(/\s+/g, ' ') : '';
+  return h('button.p-row', { type: 'button', 'data-testid': 'p-row', 'data-task-id': t.id, onclick: () => detail(t) },
+    h('span.p-kind', { 'aria-hidden': 'true' }, icon(kindOf(t).icon)), h('span.p-row-main', {}, h('span.p-row-title', {}, t.title),
+      note ? h('span.p-row-flags', { 'data-testid': 'help-snippet' }, '孩子说：' + (note.length > 72 ? note.slice(0, 72) + '…' : note)) : null,
+      flags.length ? h('span.p-row-flags', {}, ...flags) : null),
     h('span.p-row-go', { 'aria-hidden': 'true' }, icon('chevron')));
+}
+
+function weekOverview(child) {
+  const st = S.get('parent', child), items = (st.week || []).filter(t => t.child_id === child);
+  if (st.status !== 'ok' || !items.length) return null;
+  const groups = (st.groups || []).map(g => ({ ...g, portions: items.filter(t => t.assignment_id === g.id) })).filter(g => g.portions.length);
+  const legacy = items.filter(t => !t.assignment_id);
+  if (legacy.length) groups.push({ id: 'legacy', title: '已有周作业', portions: legacy });
+  return h('details.p-card.p-week-overview', { 'data-testid': 'parent-week-overview', open: !!weekOpen[child], ontoggle: e => { if (e.target.isConnected) weekOpen[child] = e.target.open; } },
+    h('summary', {}, '周作业与安排 · ' + NAME(child)), window.TaskPlanning.weekSummary(items, st.day),
+    h('p.p-muted', {}, '每份只计算一次。未安排的内容也保留在这里；已提交的份继续等检查。'),
+    ...groups.map(g => h('section.p-week-assignment', { 'data-assignment-id': g.id },
+      h('h3', {}, g.title),
+      g.total != null ? h('p', {}, '总量 ' + g.total + ' · 已确认/完成 ' + g.done + ' · 待检查 ' + g.pending + ' · 剩余 ' + g.remaining) : null,
+      g.due_day ? h('p', {}, '老师截止：' + g.due_day) : null,
+      g.deadline_conflict ? h('p.p-warn', {}, '各份截止日期不同，请查看每份的老师要求。') : null,
+      ...g.portions.map(t => h('div.p-week-portion', {},
+        row(t), h('p.p-muted', {}, '计划：' + (t.planned_day || '待安排') + ' · ' + (ST[t.status] || t.status)),
+        t.progress_note ? h('p.planning-progress', {}, '已做到：' + t.progress_note) : null,
+        t.planning_warning ? h('p.p-warn', {}, t.planning_warning === 'planned_after_due' ? '安排已晚于老师截止日，需要协调。' : '有截止日，尚待安排。') : null)),
+      g.portions.some(t => !['done', 'pending_parent', 'archived'].includes(t.status)) ? h('button.p-btn', { type: 'button', 'data-testid': 'schedule-portions', onclick: () => schedulePortions(g) }, '调整剩余部分的日期') : null)));
+}
+
+function schedulePortions(group) {
+  const message = h('p.p-form-msg', { role: 'status' });
+  const child = group.portions[0]?.child_id;
+  const st = child ? S.get('parent', child) : null;
+  const loadedDay = st?.status === 'ok' ? st.day || null : null;
+  const loaded = loadedDay ? todayTasks(child, st) : [];
+  const schoolCount = loaded.filter(t => t.work_type === 'school').length;
+  const itinerary = loaded.filter(t => t.work_type === 'itinerary' || t.itinerary || t.id?.startsWith('itinerary-') || t.home_group === 'itinerary');
+  const realToday = typeof C.today === 'function' ? C.today() : C.DEMO_DAY;
+  const loadLabel = loadedDay === realToday ? '今天' : loadedDay;
+  const loadNotice = loadedDay
+    ? '已加载的' + loadLabel + '：学校任务 ' + schoolCount + ' 项；已知行程：' + (itinerary.length ? itinerary.map(t => t.title).join('、') : '当前数据未提供') + '。'
+    : '尚未加载当天任务与行程，请先核对当天负担。';
+  const rows = group.portions.map(t => {
+    const locked = ['done', 'pending_parent', 'archived'].includes(t.status);
+    const date = inp({ type: 'date', value: t.planned_day || '', disabled: locked, 'aria-label': (t.portion_label || t.title) + '计划日期' });
+    const notice = h('p.p-muted', {}, locked ? '已提交或完成，保留原安排' : '');
+    const deadline = window.TaskPlanning.deadlineInfo(t);
+    const warn = () => {
+      if (locked) return;
+      const notes = [];
+      if (!date.value) notes.push('留空：待安排。');
+      else if (date.value !== loadedDay) notes.push('未核对当天负担（' + date.value + '）。');
+      if (deadline.date && date.value > deadline.date) notes.push('晚于老师截止 ' + deadline.label + '，需要协调。');
+      if (deadline.conflict) notes.push('截止日期记录不一致，请核对老师原要求。');
+      notice.textContent = notes.join(' ');
+    };
+    date.addEventListener('change', warn); warn();
+    return { task: t, date, notice, locked, saved: false, el: h('section.p-schedule-row', {},
+      h('strong', {}, t.portion_label || t.title), chip(t.status),
+      t.progress_note ? h('p', {}, '已做到：' + t.progress_note) : null,
+      deadline.label ? h('p.p-muted', {}, '老师截止：' + deadline.label) : null,
+      field('计划日期', date), notice) };
+  });
+  let d, busy = false;
+  const save = h('button.p-btn.primary', { type: 'button', 'data-testid': 'schedule-save', onclick: async () => {
+    if (busy) return;
+    busy = true; save.disabled = true; rows.forEach(r => { r.date.disabled = true; });
+    let count = 0;
+    for (const row of rows.filter(r => !r.locked && !r.saved && (r.date.value || null) !== r.task.planned_day)) {
+      const pending = S.pendingFor('task:' + row.task.id);
+      const matchesPlan = pending?.kind === 'update' && pending.body.planned_day === (row.date.value || null);
+      const result = pending
+        ? matchesPlan && pending.state === 'unknown' ? await S.retry(pending.key) : { result: 'rejected', code: 'unresolved_operation' }
+        : await S.update(row.task, { planned_day: row.date.value || null });
+      if (result.result !== 'saved') {
+        row.notice.textContent = result.result === 'unknown' ? '还未确认保存，重试将沿用同一次调整。' : '状态已变化，本次没有覆盖。请关闭后重新打开。';
+        rows.forEach(r => { r.date.disabled = r.locked || r.saved || r === row; });
+        message.textContent = '已保存的安排会保留。' + (result.result === 'unknown' ? '请点“再确认一次”继续。' : '请先核对最新状态，再调整其余部分。');
+        save.textContent = '再确认一次'; save.disabled = result.result !== 'unknown'; busy = false; return;
+      }
+      row.saved = true; row.notice.textContent = '已保存'; count++;
+    }
+    d.close(); toast(count ? '剩余部分的安排已保存' : '安排已核对'); render();
+  } }, '保存安排');
+  d = dialog({ title: '调整安排 · ' + group.title, cls: 'p-drawer', body: h('div.p-form', {},
+    h('p', {}, '先看学校作业和课程；留出休息和睡前准备。'),
+    h('p.p-muted', { 'data-testid': 'schedule-loaded-load' }, loadNotice),
+    h('p', {}, '根据当天课业负担选日期。留空表示待安排；总量、已做进度和老师截止日都会保留。'),
+    ...rows.map(r => r.el), message), actions: [h('button.p-btn', { type: 'button', onclick: () => d.close() }, '返回'), save] });
 }
 
 /* ================= 任务详情 ================= */
@@ -183,16 +305,26 @@ function detail(t0) {
   const t = S.find('parent', t0.child_id, t0.id) || t0, sp = t.support;
   const kv = (k, v) => v ? h('div.p-kv', {}, h('dt', {}, k), h('dd', {}, v)) : null;
   const rows = [h('p.p-detail-meta', {}, NAME(t.child_id), ' · ', (KIND[t.task_kind] || KIND.legacy).parent, ' · ', chip(t.status))];
+  if (t.original_requirement) rows.push(h('section.p-teacher-requirement', { 'data-testid': 'original-requirement' }, h('h3', {}, '老师原要求'), h('p', {}, t.original_requirement)));
+  rows.push(...window.TaskPlanning.details(t, true));
   if (t.help_note) rows.push(h('p', { 'data-testid': 'help-note', style: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', padding: '12px', background: '#fff6db', borderRadius: '12px' } }, '孩子说：' + t.help_note));
-  rows.push(h('dl.p-dl', {}, kv('老师原要求', t.original_requirement), kv('第一步', t.first_step), kv('备注', t.parent_note), t.adult_required ? kv('陪同', '需要') : null));
-  if (t.material_url || t.audio_url) rows.push(h('div.p-media', {},
-    t.material_url ? h('button.p-btn', { type: 'button', onclick: () => window.Media.openMaterial(t.material_url, t.title, { audience: 'parent', backLabel: '返回' }) }, icon('book'), '材料') : null,
-    t.audio_url ? h('audio', { controls: true, preload: 'none', src: t.audio_url, 'aria-label': '音频' }) : null));
+  rows.push(h('dl.p-dl', {}, kv('第一步', t.first_step), kv('备注', t.parent_note), t.adult_required ? kv('陪同', '需要') : null));
+  const mediaStops = [], stopMaterials = () => mediaStops.forEach(stop => stop());
+  const attached = window.TaskPlanning.materials(t, { parent: true, beforeOpen: stopMaterials });
+  mediaStops.push(attached.stop);
+  rows.push(...attached.nodes);
+  const legacy = attached.legacy;
+  const legacyAudio = legacy.audio_url ? h('audio', { controls: true, preload: 'none', src: legacy.audio_url, 'aria-label': '音频' }) : null;
+  if (legacyAudio) mediaStops.push(() => legacyAudio.pause());
+  if (legacy.material_url || legacyAudio) rows.push(h('div.p-media', {},
+    legacy.material_url ? h('button.p-btn', { type: 'button', onclick: () => { stopMaterials(); window.Media.openMaterial(legacy.material_url, t.title, { audience: 'parent', backLabel: '返回' }); } }, icon('book'), '材料') : null,
+    legacyAudio));
   if (sp) rows.push(h('details.p-sub', {}, h('summary', {}, '成人支持'),
     h('dl.p-dl', {}, kv('示范', sp.adult_demo), kv('可接受', sp.acceptable_response), kv('简化', sp.simplify), kv('停止', sp.stop_rule), kv('给孩子', sp.child_demo), kv('来源', sp.source))));
   if (['mock', 'lan'].includes(C.TRANSPORT) && paperish(t)) rows.push(photoPost(t, { compact: true, onChanged: () => { d.close(); detail(S.find('parent', t.child_id, t.id) || t); } }));
   const canConfirm = !(requiresPhoto(t) && t.status === 'pending_parent' && !hasPhotos(t));
-  const primary = t.status === 'pending_parent' ? (canConfirm ? ['done', '确认完成'] : null) : t.status === 'help' ? ['todo', '已处理'] : t.status === 'archived' ? ['todo', '恢复'] : needsKind(t) ? ['assign', '核对类型'] : null;
+  const primary = t.status === 'pending_parent' ? (canConfirm ? ['done', '确认完成'] : null) : t.status === 'help' ? ['todo', '已回应，继续做'] : t.status === 'archived' ? ['todo', '恢复'] : needsKind(t) ? ['assign', '核对类型'] : null;
+  if (t.status === 'help') rows.push(h('p.p-muted', { 'data-testid': 'help-response-note' }, '回应不等于已调整；日期以保存安排为准。'));
   if (t.status === 'pending_parent' && requiresPhoto(t) && !hasPhotos(t)) rows.push(h('p.p-warn', { 'data-testid': 'confirm-need-photo' }, '还没有作业照片，请先让孩子补拍后再确认。'));
   let mistakeCheck = null, mistakeNote = null;
   if (C.TRANSPORT === 'lan' && t.child_id === 'child_a' && t.task_kind === 'paper' && t.status === 'pending_parent') {
@@ -205,8 +337,8 @@ function detail(t0) {
   if (['mock', 'lan'].includes(C.TRANSPORT)) more.push(['edit', '修改内容', false]);
   if (!['done', 'archived'].includes(t.status) && !(primary && primary[0] === 'done')) more.push(['done', '标记完成', false]);
   if (['done', 'pending_parent', 'paused', 'doing'].includes(t.status)) more.push(['todo', '改回没开始', true]);
-  if (t.status !== 'archived') more.push(['archived', '归档', true]);
-  if (['mock', 'lan'].includes(C.TRANSPORT)) more.push(['delete', '删除', true]);
+  if (!window.TaskPlanning.isWeekly(t) && t.status !== 'archived') more.push(['archived', '归档', true]);
+  if (!window.TaskPlanning.isWeekly(t) && ['mock', 'lan'].includes(C.TRANSPORT)) more.push(['delete', '删除', true]);
   if (needsKind(t) && !(primary && primary[0] === 'assign')) more.push(['assign', '核对类型', false]);
   let d;
   const run = async (s, danger) => {
@@ -240,7 +372,7 @@ function detail(t0) {
   const hist = log.filter(x => x.what.includes(short(t.title)));
   rows.push(h('details.p-sub', {}, h('summary', {}, `记录（${hist.length}）`), hist.length ? h('ul.p-log', {}, ...hist.map(x => h('li', {}, x.at.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' · ' + x.what))) : h('p.p-muted', {}, '—')));
   rows.push(h('details.p-sub.tech', {}, h('summary', {}, '技术信息'), h('dl.p-dl.mono', {}, kv('task_id', t.id), kv('version', String(t.version)), kv('status', t.status), kv('task_kind', t.task_kind), kv('assignment_state', t.assignment_state))));
-  d = dialog({ title: t.title, body: h('div.p-detail', {}, ...rows), cls: 'p-drawer', actions: [h('button.p-btn', { type: 'button', onclick: () => d.close() }, '关闭')] });
+  d = dialog({ title: t.title, body: h('div.p-detail', {}, ...rows), cls: 'p-drawer', onClose: stopMaterials, actions: [h('button.p-btn', { type: 'button', onclick: () => d.close() }, '关闭')] });
 }
 function assignDialog(t) {
   let pick = t.task_kind === 'legacy' ? 'paper' : t.task_kind;
@@ -258,11 +390,16 @@ function taskFormSave(form, button, make, onSaved, pending) {
   let busy = false, unresolved = pending || null;
   form.noValidate = true;
   const lock = value => {
-    form.querySelectorAll('input,select,textarea').forEach(el => { el.disabled = value; });
+    form.querySelectorAll('input,select,textarea,button').forEach(el => { el.disabled = value || el.dataset.fixedDisabled === 'true'; });
     button.disabled = value;
     form.setAttribute('aria-busy', String(busy));
   };
   const rejectedMessage = r => {
+    if (r.code === 'unresolved_operation') return '上一次操作还没有确认保存，请返回今天，先重试那一次操作。';
+    if (r.code === 'task_replan_locked') return '这份已经提交或完成，请保留原安排；只调整还没做完的部分。';
+    if (r.code === 'weekly_portion_required') return '这一份属于老师要求的总量，请保留内容，只调整安排。';
+    if (r.code === 'reward_amount_locked') return '这一份已经发过经验，撤销后也保留原金额。请重新打开任务核对；其他内容仍可修改。';
+    if (r.code === 'weekly_conversion_required') return '请保留已有任务类型；新建周作业时再划分固定的小份。';
     if (r.status === 409) return '这条任务已在别处修改，本次没有覆盖。请关闭后重新打开，查看最新内容。';
     if (r.status === 404) return '这条任务已不存在，本次未保存。请返回今天查看。';
     if (r.code === 'unsupported_link') return '未保存：材料或音频链接不支持。请使用网页链接，或把链接留空。';
@@ -305,8 +442,105 @@ function taskFormSave(form, button, make, onSaved, pending) {
 const taskFields = v => ({ title: (v.title || '').trim(), first_step: (v.first_step || '').trim(),
   parent_note: v.parent_note || '', material_url: (v.material_url || '').trim(), audio_url: (v.audio_url || '').trim(), task_kind: v.kind });
 
+function materialEditor(initial = []) {
+  const list = h('div.p-material-editor');
+  const rows = [];
+  function add(m = {}) {
+    const kind = sel('', Object.entries(window.TaskPlanning.materialKindLabels), m.kind || 'exercise');
+    kind.setAttribute('aria-label', '材料用途');
+    const title = inp({ value: m.title || '', maxlength: 100, placeholder: '材料名称', 'aria-label': '材料名称' });
+    const url = inp({ value: m.url || '', maxlength: 2000, placeholder: 'assets/… 或 https://…', 'aria-label': '材料链接' });
+    const from = inp({ type: 'number', min: 1, value: m.page_from || '', placeholder: '起始页', 'aria-label': 'PDF起始页' });
+    const to = inp({ type: 'number', min: 1, value: m.page_to || '', placeholder: '结束页', 'aria-label': 'PDF结束页' });
+    const row = { kind, title, url, from, to };
+    row.el = h('div.p-material-row', {}, kind, title, url, h('div.p-page-range', {}, from, to),
+      h('button.p-btn', { type: 'button', onclick: () => { rows.splice(rows.indexOf(row), 1); row.el.remove(); } }, '移除'));
+    rows.push(row); list.append(row.el);
+  }
+  initial.forEach(add);
+  const el = h('details.p-sub', { open: initial.length > 0 }, h('summary', {}, '对应材料 · 分清用途'),
+    h('p.p-muted', {}, '按使用顺序添加；PDF可填写页码。答案会单独收起。'), list,
+    h('button.p-btn', { type: 'button', onclick: () => add() }, icon('plus'), '添加材料'));
+  return { el, read: () => rows.filter(r => r.url.value.trim()).map(r => ({
+    kind: r.kind.value, title: r.title.value.trim() || r.kind.selectedOptions[0].textContent,
+    url: r.url.value.trim(), ...(r.from.value ? { page_from: Number(r.from.value) } : {}),
+    ...(r.to.value ? { page_to: Number(r.to.value) } : {})
+  })) };
+}
+function planningControls(t = {}, { creating = false } = {}) {
+  const material = materialEditor(t.materials || []);
+  const kinds = [['school', '学校作业'], ['weekly', '周作业 / 一段时间完成的总量']];
+  if (!creating) kinds.push(['habit', '已有习惯打卡'], ['itinerary', '已有行程']);
+  const kind = sel('work_type', kinds, t.work_type || (t.plan ? 'weekly' : 'school'));
+  if (!creating) { kind.disabled = true; kind.dataset.fixedDisabled = 'true'; }
+  const plan = inp({ name: 'planned_day', type: 'date', value: t.planned_day === null ? '' : t.planned_day || t.day || today(), readonly: !creating && ['done', 'pending_parent'].includes(t.status) });
+  const deadline = window.TaskPlanning.deadlineInfo(t);
+  const due = inp({ name: 'due_day', type: 'date', value: deadline.date || '', readonly: deadline.exact });
+  const photo = h('input', { type: 'checkbox', name: 'photo_required', checked: typeof t.photo_required === 'boolean' ? t.photo_required : creating ? false : requiresPhoto(t) });
+  const xp = inp({ name: 'exp_award', type: 'number', min: 0, max: 50, value: Number.isInteger(t.exp_award) ? t.exp_award : 3, readonly: !!t.exp_award_locked });
+  const requirement = h('textarea.p-input', { name: 'original_requirement', rows: 3, maxlength: 8000, placeholder: '保留老师原话；课堂要求与家庭要求分清' }, t.original_requirement || '');
+  const planField = field('计划做的日期', plan);
+  const dueField = field('老师真实截止日（没给就留空）', due);
+  if (deadline.exact) dueField.append(h('p.p-muted', { 'data-testid': 'exact-deadline-locked' }, '原要求截止：' + deadline.label + '。这里只调整计划日期，真实截止时刻保持不变。'));
+  if (deadline.conflict) dueField.append(h('p.p-warn', { 'data-testid': 'deadline-conflict' }, '当前截止日期与老师原时刻不一致，请核对原要求。保存后按原时刻的日期保留。'));
+  const xpField = field('这一份的经验', xp);
+  if (t.exp_award_locked) xpField.append(h('p.p-muted', { 'data-testid': 'reward-amount-locked' }, '这一份已发过经验，撤销后仍保留原金额；再次完成不会多领一份。'));
+  const photoField = h('label.p-switch', {}, photo, h('span', {}, '这项纸笔作业需要拍照（哥哥）'));
+  const el = h('section.p-planning-fields', {}, field('安排类型', kind), planField,
+    dueField, field('老师原要求', requirement),
+    photoField, xpField, material.el);
+  const read = () => ({
+    work_type: kind.value, planned_day: plan.value || null, due_day: deadline.exact ? deadline.date : due.value || null,
+    original_requirement: requirement.value, photo_required: photo.checked,
+    exp_award: Number(xp.value), materials: material.read()
+  });
+  function sync(child, taskKind, weeklyCreate = false) {
+    const showPhoto = child === 'child_a' && ['paper', 'legacy'].includes(taskKind);
+    photoField.hidden = !showPhoto;
+    if (!showPhoto) photo.checked = false;
+    planField.hidden = weeklyCreate; material.el.hidden = weeklyCreate; xpField.hidden = weeklyCreate;
+    plan.required = kind.value !== 'weekly';
+  }
+  return { el, read, kind, plan, due, xp, photo, requirement, sync };
+}
+function portionEditor() {
+  const amount = inp({ type: 'number', min: 1, max: 50, step: 1, value: 3, 'aria-label': '总份数' });
+  const unit = sel('', [['份', '份'], ['关', '关'], ['天', '天'], ['篇', '篇']], '份');
+  unit.setAttribute('aria-label', '份的单位');
+  const list = h('div.p-portion-editor'), total = h('p.p-muted');
+  const rows = [];
+  const refreshTotal = () => { total.textContent = '共 ' + rows.length + ' 份，全部完成共 ' + rows.reduce((n, r) => n + (Number(r.xp.value) || 0), 0) + ' 经验。日期由你结合当天负担安排。'; };
+  function resize(defaultXp = 3) {
+    const n = Math.max(1, Math.min(50, Math.floor(Number(amount.value) || 1)));
+    amount.value = n;
+    while (rows.length > n) rows.pop().el.remove();
+    while (rows.length < n) {
+      const label = inp({ value: '第' + (rows.length + 1) + unit.value, maxlength: 50, required: true, 'aria-label': '这一份的内容' });
+      const date = inp({ type: 'date', 'aria-label': '这一份计划日期' });
+      const xp = inp({ type: 'number', min: 0, max: 50, value: defaultXp, 'aria-label': '这一份经验', oninput: refreshTotal });
+      const row = { label, date, xp };
+      row.el = h('div.p-portion-row', {}, field('内容', label), field('计划日期', date), field('经验', xp));
+      rows.push(row); list.append(row.el);
+    }
+    refreshTotal();
+  }
+  const el = h('section.p-week-create', { hidden: true }, h('h3', {}, '分成固定的小份'),
+    h('div.p-page-range', {}, field('总量', amount), field('单位', unit),
+      h('button.p-btn', { type: 'button', onclick: () => resize() }, '设置份数')),
+    h('p.p-muted', {}, '一份可以是一关、一篇或一次练习。未排日期的内容保留在周作业里；每份材料可在保存后分别添加。'),
+    list, total);
+  resize();
+  amount.addEventListener('change', () => resize());
+  unit.addEventListener('change', () => rows.forEach((r, i) => { if (/^第\d+[份关天篇]$/.test(r.label.value)) r.label.value = '第' + (i + 1) + unit.value; }));
+  return { el, read: () => rows.map(r => ({ label: r.label.value.trim(), planned_day: r.date.value || null, exp_award: Number(r.xp.value), materials: [] })),
+    reset: () => { rows.splice(0); list.replaceChildren(); amount.value = 3; unit.value = '份'; resize(); },
+    restore: portions => { rows.splice(0); list.replaceChildren(); amount.value = portions.length; resize(); portions.forEach((p, i) => { rows[i].label.value = p.label; rows[i].date.value = p.planned_day || ''; rows[i].xp.value = p.exp_award; }); refreshTotal(); } };
+}
+
 function editDialog(t0) {
   const t = S.find('parent', t0.child_id, t0.id) || t0;
+  const pending = S.pendingFor('task:' + t.id);
+  const planning = C.TRANSPORT === 'lan' ? planningControls(pending?.kind === 'update' ? { ...t, ...pending.body } : t) : null;
   const f = h('form.p-form', { 'data-testid': 'edit-form' },
     field('名称', inp({ name: 'title', required: true, maxlength: 100, value: t.title || '' })),
     field('第一步（选填）', inp({ name: 'first_step', placeholder: '作业已明确可留空', value: t.first_step || '' })),
@@ -318,8 +552,9 @@ function editDialog(t0) {
     h('details.p-sub', { open: !!(t.material_url || t.audio_url) }, h('summary', {}, '链接'),
       field('材料（选填）', inp({ name: 'material_url', value: t.material_url || '', placeholder: 'assets/… 或 https://…' })),
       field('音频（选填）', inp({ name: 'audio_url', value: t.audio_url || '', placeholder: 'assets/… 或 https://…' }))),
+    planning?.el,
     h('p.p-form-msg', { role: 'status', 'aria-live': 'polite' }));
-  const pending = S.pendingFor('task:' + t.id);
+  if (planning) { const sync = () => planning.sync(t.child_id, f.elements.kind.value); f.addEventListener('change', sync); sync(); }
   if (pending?.kind === 'update') {
     for (const key of ['title', 'first_step', 'parent_note', 'material_url', 'audio_url']) f.elements[key].value = pending.body[key] || '';
     f.querySelectorAll('[name=kind]').forEach(el => { el.checked = el.value === pending.body.task_kind; });
@@ -329,7 +564,7 @@ function editDialog(t0) {
   const d = dialog({ title: '修改任务', body: f, cls: 'p-drawer', actions: [
     h('button.p-btn', { type: 'button', onclick: () => d.close() }, '取消'), button
   ] });
-  save = taskFormSave(f, button, v => S.update(t, taskFields(v)), () => {
+  save = taskFormSave(f, button, v => S.update(t, { ...taskFields(v), ...(planning ? planning.read() : {}) }), () => {
     d.close(); log.unshift({ at: new Date(), what: `${NAME(t.child_id)} · 修改任务` }); toast('已保存'); render();
   }, pending?.kind === 'update' ? pending : null);
   f.onsubmit = e => { e.preventDefault(); save(); };
@@ -390,7 +625,7 @@ function photoPost(t, { compact, pack, onChanged } = {}) {
       foot.push(h('button.p-btn' + (p.teacher_sent ? '' : '.primary'), { type: 'button', 'data-testid': 'mark-sent', onclick: async () => {
         if (!p.teacher_sent && !(await confirmDialog({ title: '标记已发老师？', text: `${NAME(t.child_id)} · ${t.title} · ${p.photos.length} 张`, ok: '标记' }))) return;
         const v = !p.teacher_sent;
-        if (await setSent(t, v)) { paint(photoInfo[t.id]); render(); toast(v ? '已标记' : '已取消标记', { undo: v ? async () => { await setSent(t, false); render(); } : null }); }
+        if (await setSent(t, v, p.photos)) { paint(photoInfo[t.id]); render(); toast(v ? '已标记' : '已取消标记', { undo: v ? async () => { await setSent(t, false, p.photos); render(); } : null }); }
       } }, icon('send'), p.teacher_sent ? '取消已发' : '已发老师'));
     }
     box.append(h('footer.p-post-foot', {}, ...foot));
@@ -400,14 +635,15 @@ function photoPost(t, { compact, pack, onChanged } = {}) {
     PhotoAdapter.list('parent', sel, t.id).then(r => { if (r.ok) { photoInfo[t.id] = r.data; paint(r.data); } else box.replaceChildren(h('p.p-warn', {}, '读取失败')); }); }
   return box;
 }
-async function setSent(t, value) {
+async function setSent(t, value, scopePhotos) {
   const sel = { day: t.day, child_id: t.child_id };
   const cur = await PhotoAdapter.list('parent', sel, t.id);
   if (!cur.ok) { toast('读取失败'); return false; }
-  const body = { day: t.day, child_id: t.child_id, task_id: t.id, value, expected_revision: cur.data.revision, operation_id: uuid() };
+  const ids = (scopePhotos || cur.data.photos).map(p => p.id);
+  const body = { day: t.day, child_id: t.child_id, task_id: t.id, value, expected_revision: cur.data.revision, operation_id: uuid(), ...(C.TRANSPORT === 'lan' ? { photo_ids: ids } : {}) };
   for (let i = 0; i < 2; i++) {          // 结果未知 → 同一 operation_id 重试一次
     const r = await PhotoAdapter.markSent(body);
-    if (r.ok) { const b = await PhotoAdapter.list('parent', sel, t.id); if (b.ok && b.data.teacher_sent === value) { photoInfo[t.id] = b.data; log.unshift({ at: new Date(), what: `${NAME(t.child_id)} · ${short(t.title)} · ${value ? '已发老师' : '取消已发'}` }); return true; } }
+    if (r.ok) { const b = await PhotoAdapter.list('parent', sel, t.id); if (b.ok && (C.TRANSPORT === 'lan' ? ids.every(id => b.data.photos.some(p => p.id === id && p.teacher_sent === value)) : b.data.teacher_sent === value)) { photoInfo[t.id] = b.data; log.unshift({ at: new Date(), what: `${NAME(t.child_id)} · ${short(t.title)} · ${value ? '已发老师' : '取消已发'}` }); return true; } }
     if (r.status === 409) { toast('已被修改，已刷新'); const b = await PhotoAdapter.list('parent', sel, t.id); if (b.ok) photoInfo[t.id] = b.data; render(); return false; }
     if ([400, 403, 404].includes(r.status)) { toast('未保存'); return false; }
   }
@@ -441,29 +677,49 @@ function manageTab() {
   return [box];
 }
 function createForm() {
+  const pending = Object.values(S.pending).find(op => op.kind === 'create');
+  const body = pending?.body || {};
+  const planning = C.TRANSPORT === 'lan' ? planningControls(body, { creating: true }) : null;
+  const portions = planning ? portionEditor() : null;
+  const links = h('details.p-sub', {}, h('summary', {}, '链接'),
+    field('材料（选填）', inp({ name: 'material_url', placeholder: 'assets/… 或 https://…' })),
+    field('音频（选填）', inp({ name: 'audio_url', placeholder: 'assets/… 或 https://…' })));
   const f = h('form.p-form', { 'data-testid': 'create-form' },
     field('孩子', sel('child', KIDS.map(c => [c, NAME(c)]), who === 'all' ? KIDS[0] : who)),
     field('名称', inp({ name: 'title', required: true, maxlength: 100 })),
     field('第一步（选填）', inp({ name: 'first_step', placeholder: '作业已明确可留空' })),
-    h('div.p-field', {}, h('span', {}, '类型'), h('div.p-seg', { role: 'radiogroup', 'aria-label': '类型' }, ...['paper', 'audio', 'reading'].map((k, i) => h('label.p-seg-opt', {}, h('input', { type: 'radio', name: 'kind', value: k, checked: i === 0 }), h('span', {}, KIND[k].parent))))),
+    h('div.p-field', {}, h('span', {}, '完成方式'), h('div.p-seg', { role: 'radiogroup', 'aria-label': '完成方式' }, ...['paper', 'audio', 'reading'].map((k, i) => h('label.p-seg-opt', {}, h('input', { type: 'radio', name: 'kind', value: k, checked: i === 0 }), h('span', {}, KIND[k].parent))))),
     h('label.p-switch', {}, h('input', { type: 'checkbox', name: 'verified', checked: true }), h('span', {}, '已核对（孩子可见）')),
     field('备注（选填）', inp({ name: 'parent_note' })),
-    h('details.p-sub', {}, h('summary', {}, '链接'), field('材料（选填）', inp({ name: 'material_url', placeholder: 'assets/… 或 https://…' })), field('音频（选填）', inp({ name: 'audio_url', placeholder: 'assets/… 或 https://…' }))),
+    links, planning?.el, portions?.el,
     h('p.p-form-msg', { role: 'status', 'aria-live': 'polite' }),
     h('button.p-btn.primary.wide', { type: 'submit', 'data-testid': 'create-submit' }, '保存'));
-  const pending = Object.values(S.pending).find(op => op.kind === 'create');
   if (pending) {
-    const body = pending.body;
     for (const key of ['title', 'first_step', 'parent_note', 'material_url', 'audio_url']) f.elements[key].value = body[key] || '';
     f.elements.child.value = body.child_id;
     f.elements.verified.checked = body.assignment_state === 'verified';
     f.querySelectorAll('[name=kind]').forEach(el => { el.checked = el.value === body.task_kind; });
+    if (body.portions && portions) portions.restore(body.portions);
   }
-  const save = taskFormSave(f, f.querySelector('[data-testid=create-submit]'), v => S.create({
-    ...taskFields(v), child_id: v.child, assignment_state: v.verified ? 'verified' : 'pending'
-  }), r => {
-    f.reset(); f.elements.verified.checked = true;
-    f.querySelector('.p-form-msg').textContent = '已保存。可继续新增任务。';
+  const sync = () => {
+    if (!planning) return;
+    const weekly = planning.kind.value === 'weekly';
+    planning.sync(f.elements.child.value, f.elements.kind.value, weekly);
+    portions.el.hidden = !weekly;
+    links.hidden = weekly;
+    f.elements.title.maxLength = weekly ? 40 : 100;
+  };
+  f.addEventListener('change', sync); sync();
+  const save = taskFormSave(f, f.querySelector('[data-testid=create-submit]'), v => {
+    const fields = { ...taskFields(v), child_id: v.child, assignment_state: v.verified ? 'verified' : 'pending', ...(planning ? planning.read() : {}) };
+    if (fields.work_type === 'weekly') {
+      fields.portions = portions.read();
+      fields.material_url = ''; fields.audio_url = ''; fields.materials = [];
+    }
+    return S.create(fields);
+  }, r => {
+    const next = createForm(); f.replaceWith(next);
+    next.querySelector('.p-form-msg').textContent = r.op.body.portions ? '已保存固定的小份。回到今天的周作业，按份查看或添加对应材料。' : '已保存。可继续新增任务。';
     log.unshift({ at: new Date(), what: `${NAME(r.op.body.child_id)} · 新增 ${short(r.op.body.title)}` });
     toast('已保存');
   }, pending);

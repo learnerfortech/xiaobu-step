@@ -6,7 +6,7 @@
 (function(){
 const { h, icon, mascot, say, kindOf, Prefs, pastBoundary } = window.UI;
 const { AudioPlayer, openMaterial, isImageUrl } = window.Media;
-const S = window.Store, CH = 'child_b', C = window.APP_CONFIG;
+const S = window.Store, CH = 'child_b', C = window.APP_CONFIG, Planning = window.TaskPlanning;
 const DOOR = { reading: ['看一看', '和妈妈一起看一看！', 'story', 'book'], paper: ['画一画', '拿出纸和笔，和妈妈一起画一画！', 'count', 'pencil'],
   audio: ['听一听', '听一听，听到铃声就指一指！', 'pinyin', 'ear'], legacy: ['做一做', '和妈妈一起做一做！', 'sun', 'star'] };
 const door = t => { if (/^joey-\d{8}-bag-open$/.test(t.id)) return ['打开书包','','bag-open','book']; if (/^joey-\d{8}-bag-pack$/.test(t.id)) return ['整理书包','','bag-pack','book']; const d = DOOR[t.task_kind] || DOOR.legacy; return t.child_label ? [t.child_label, d[1], d[2], d[3]] : d; };
@@ -15,7 +15,7 @@ const taskTitle = window.TaskPlanning.taskTitle;
 const flowRank = t => /^joey-\d{8}-bag-open$/.test(t.id) ? 0 : /^joey-\d{8}-bag-pack$/.test(t.id) ? 2 : 1;
 const orderedTasks = tasks => (tasks || []).filter(t => t.child_id === CH).slice().sort((a, b) => flowRank(a) - flowRank(b));
 const nextTask = (tasks, id) => {
-  const list = orderedTasks(tasks), at = list.findIndex(t => t.id === id);
+  const list = orderedTasks(Planning.dayView(orderedTasks(tasks), C.today()).today), at = list.findIndex(t => t.id === id);
   return [...list.slice(at + 1), ...list.slice(0, Math.max(0, at))].find(t => !finished(t)) || null;
 };
 let buddy = null, stopMedia = () => {}, lastLine = null, spoken = null;
@@ -52,6 +52,7 @@ function paintReadTask() {
   const failed = taskRead.state === 'failed';
   label.textContent = failed ? '点我听作业' : taskRead.state === 'playing' ? '再听一遍' : '听作业';
   button.style.background = failed ? '#a74400' : '';
+  button.style.color = failed ? '#ffffff' : '';
   button.style.outline = failed ? '4px solid #ffd66b' : '';
   const msg = document.querySelector('[data-testid=listen-homework-status]');
   if (msg) msg.textContent = failed ? '还没播出来，点上面的大按钮再试一次。' : taskRead.state === 'playing' ? '正在读这份作业' : '点一下，听标题和怎么做。';
@@ -94,7 +95,17 @@ const SUBJECTS = [
 ];
 const subjectOf = t => SUBJECTS.find(s => s.match.test(t.title || ''));
 const groupOf = t => flowRank(t)!==1 || t.home_group==='flow' ? 'flow' : t.work_type==='itinerary' || t.itinerary || t.id.startsWith('itinerary-') || t.home_group==='itinerary' ? 'itinerary' : 'school';
-const statusText = t => (t.carried_over && !Planning.isWeekly(t) ? '顺延 · ' : '') + (t.status === 'done' ? '已完成' : t.status === 'pending_parent' ? '已提交，等妈妈检查' : t.status === 'paused' ? '未完成' : '点开开始');
+const statusText = t => (t.carried_over && !Planning.isWeekly(t) ? '顺延 · ' : '') + (t.status === 'done' ? '已完成' : t.status === 'pending_parent' ? '已提交，等妈妈检查' : t.status === 'help' ? '请妈妈看看' : t.status === 'doing' ? '接着做' : t.status === 'paused' ? '未完成' : '点开开始');
+const countText = tasks => '待做 ' + tasks.filter(t => !finished(t)).length + ' · 待检查 ' + tasks.filter(t => t.status === 'pending_parent').length + ' · 已完成 ' + tasks.filter(t => t.status === 'done').length;
+function needsPlanPanel(tasks) {
+  if (!tasks.length) return null;
+  return h('details.week-overview.joey-needs-plan', { 'data-testid': 'joey-needs-plan' },
+    h('summary', {}, '有' + tasks.length + '份等妈妈安排'),
+    h('p', {}, '已经做过的还在，不算今天新加的作业。'),
+    ...tasks.map(t => h('div.week-portion', {}, h('strong', {}, t.title),
+      t.progress_note ? h('p.planning-progress', {}, '已做到：' + t.progress_note) : null,
+      h('button.c-btn', { type: 'button', onclick: () => enterTask(t) }, '看这一份'))));
+}
 function enterTask(t) {
   handoff = { id:t.id, until:Date.now()+2000 }; readTask(t); App.go('#/joey/task/'+t.id);
 }
@@ -117,24 +128,28 @@ function home(root) {
   if(st.status==='error') {
     root.replaceChildren(stage('joey-error',{onDoor:()=>App.go('#/'),kids:[h('h1',{style:{fontSize:'30px'},role:'alert'},'没连上家里电脑'),h('p',{},'看看电脑是否开着，平板是否连着家里 Wi-Fi。'),h('button.c-btn.primary',{type:'button','data-testid':'retry-load',onclick:()=>S.load('child',CH)},'再试一次'),h('button.c-btn',{type:'button',onclick:()=>App.go('#/')},'回选人')]}));return;
   }
-  const tasks=orderedTasks(st.tasks),open=tasks.filter(t=>!finished(t));
+  const view=Planning.dayView(orderedTasks(st.tasks),st.day||C.today());
+  const needsPlan=Planning.dayView([...orderedTasks(st.tasks),...orderedTasks(st.week)],st.day||C.today()).needsPlan;
+  const tasks=orderedTasks([...view.today,...view.itineraries]),work=view.today,open=work.filter(t=>!finished(t));
   const bagOpen=tasks.find(t=>flowRank(t)===0),bagPack=tasks.find(t=>flowRank(t)===2);
   const schoolTasks=tasks.filter(t=>groupOf(t)==='school'),itineraries=tasks.filter(t=>groupOf(t)==='itinerary');
-  const count=schoolTasks.filter(finished).length;
+  const waiting=work.filter(t=>t.status==='pending_parent').length;
   let greet='Joey，先打开书包，再看看今天的作业。',name='joey-home';
-  if(!tasks.length){greet='今天没有任务。';name='joey-empty';}
-  else if(!open.length){greet='今天任务全部完成！乐乐真的太棒了！';name='joey-alldone';}
+  if(!tasks.length&&!needsPlan.length){greet='今天没有任务。';name='joey-empty';}
+  else if(!tasks.length){greet='有'+needsPlan.length+'份等妈妈安排。';}
+  else if(work.length&&!open.length){greet=waiting?'今天安排已经提交，'+waiting+'项等妈妈检查。':'今天安排已完成，可以休息啦。';name='joey-alldone';}
   const content=h('div.j-home-flow',{'data-testid':name==='joey-alldone'?'state-alldone':'joey-doors'},
     flowCard({title:'打开书包',hue:'bag-open',ic:'book',task:bagOpen}),
-    flowCard({title:'今日作业',subtitle:`已完成 ${count}／${schoolTasks.length}`,hue:'school',ic:'pencil',testid:'joey-school-door',onclick:()=>{Voice.stop();App.go('#/joey/school');}}),
+    flowCard({title:'今日作业',subtitle:countText(schoolTasks),hue:'school',ic:'pencil',testid:'joey-school-door',onclick:()=>{Voice.stop();App.go('#/joey/school');}}),
     flowCard({title:'整理书包',hue:'bag-pack',ic:'book',task:bagPack}),
     flowCard({title:'闯关小游戏',subtitle:'规则换换换 · 下一个是什么',hue:'games',ic:'star',testid:'joey-game-door',onclick:()=>{Voice.unlock?.();App.go('#/joey/games');}}),
+    needsPlanPanel(needsPlan),
     itineraries.length?h('section.j-itineraries',{'aria-label':'行程提醒'},h('h2',{},'行程提醒'),...itineraries.map(t=>h('button.j-itinerary',{type:'button','data-testid':'joey-itinerary',onclick:()=>enterTask(t)},icon('clock'),h('span',{},taskTitle(t, t.child_label||t.title)),h('small',{},statusText(t))))):null);
   const el=stage(name,{onDoor:()=>App.go('#/'),kids:[Progress.homeBuddy(CH),content,name==='joey-alldone'?h('p.j-all-done',{role:'status'},'喷火龙：'+greet):null,hear()]});
   el.classList.add('joey-flow-home');root.replaceChildren(el);
   mountGuide(root,open.length||!tasks.length?'wave':'happy');
   if(name==='joey-alldone'){
-    const key='xb.joey.allDoneSpoken.'+C.today();let already=false;
+    const key='xb.joey.allDoneSpoken.'+C.today()+'.'+(waiting?'submitted':'confirmed');let already=false;
     try{already=localStorage.getItem(key)==='1';if(!already)localStorage.setItem(key,'1');}catch(_){already=spoken===name;}
     lastLine=greet;spoken=name;if(!already)say(greet,null,null,{preserveText:true});
   }else once(name,greet);
@@ -142,7 +157,7 @@ function home(root) {
 function school(root) {
   stopMedia();Voice.stop();
   const st=S.get('child',CH);if(st.status!=='ok')return home(root);
-  const tasks=orderedTasks(st.tasks).filter(t=>groupOf(t)==='school');
+  const tasks=orderedTasks(Planning.dayView(orderedTasks(st.tasks),st.day||C.today()).today).filter(t=>groupOf(t)==='school');
   const cards=SUBJECTS.flatMap(s=>{
     const matches=tasks.filter(t=>subjectOf(t)===s);
     return matches.length?matches.map(t=>flowCard({title:s.name,subtitle:statusText(t)+(matches.length>1?' · '+(t.child_label||t.title):''),hue:s.hue,ic:s.ic,task:t}))
@@ -150,7 +165,7 @@ function school(root) {
   });
   const extras=tasks.filter(t=>!subjectOf(t));
   root.replaceChildren(stage('joey-school',{onDoor:()=>App.go('#/joey'),kids:[
-    h('section.j-school-list',{},h('h1',{},'今日作业'),h('p.j-school-count',{},`已完成 ${tasks.filter(finished).length}／${tasks.length}`),...cards,
+    h('section.j-school-list',{},h('h1',{},'今日作业'),h('p.j-school-count',{},countText(tasks)),...cards,
       extras.length?h('section',{},h('h2',{},'其他作业'),...extras.map(t=>flowCard({title:t.child_label||t.title,hue:'school',ic:'book',task:t}))):null),hear()]}));
   mountGuide(root);once('school','点一科，听听今天要做什么。');
 }
@@ -207,16 +222,16 @@ function task(root, id) {
         act(t, paperish ? 'pending_parent' : 'done');
       } }, icon('check'), h('span', {}, busy ? '…' : '完成'));
   const escape = unknown || busy ? h('button.c-btn.ghost', { type:'button', style:wide, 'data-testid':'save-leave', onclick:()=>leaveUnknown(t) }, '先返回／还没做完') : null;
-  const all = orderedTasks(S.get('child', CH).tasks), idx = all.findIndex(x => x.id === t.id);
+  const all = orderedTasks(Planning.dayView(orderedTasks(S.get('child', CH).tasks), C.today()).today);
   const fin = all.filter(x => ['done', 'pending_parent'].includes(x.status)).length;
-  const progress = h('div.j-progress', { role: 'progressbar', 'aria-label': '进度', 'aria-valuemin': 0, 'aria-valuemax': all.length, 'aria-valuenow': fin }, h('i', { style: { width: (all.length ? fin / all.length * 100 : 0) + '%' } }));
+  const progress = h('div.j-progress', { role: 'progressbar', 'aria-label': '已做进度，' + all.filter(x => x.status === 'pending_parent').length + '项待检查', 'aria-valuemin': 0, 'aria-valuemax': all.length, 'aria-valuenow': fin }, h('i', { style: { width: (all.length ? fin / all.length * 100 : 0) + '%' } }));
   const instructions = h('section.j-media.j-task-instructions', { 'data-testid': 'joey-task-instructions' },
     h('h1.tcard-title', { 'data-testid': 'task-title' }, taskTitle(t, t.title)),
     finished(t) ? h('p.task-completion-status', {}, statusText(t)) : null,
     t.original_requirement ? h('section.task-requirement', { 'data-testid': 'original-requirement' }, h('h2', {}, '老师的原话'), h('p.req-text', {}, t.original_requirement)) : null,
     ...window.TaskPlanning.details(t),
     Number.isInteger(t.exp_award) ? h('p', { 'data-testid': 'task-exp' }, '完成可得 +' + t.exp_award + ' 经验') : null,
-    t.first_step && t.first_step !== t.original_requirement ? h('p.tcard-step', {}, t.first_step) : null,
+    t.first_step && t.first_step !== t.original_requirement ? h('section.task-first-step', { 'data-testid': 'task-first-step' }, h('h2', {}, '先做这一步'), h('p.tcard-step', {}, t.first_step)) : null,
     t.adult_required ? h('span', {}, '和妈妈一起做') : null);
   root.replaceChildren(stage('joey-task', { onDoor: () => { if (unknown || busy) return leaveUnknown(t); last = {}; App.go(groupOf(t)==='school' ? '#/joey/school' : '#/joey'); }, help: helpBtn, progress, close: true,
     kids: [h('div.j-task', {}, instructions, h('button.c-btn.primary', { type: 'button', 'data-testid': 'listen-homework', style: wide, onclick: () => readTask(t) }, icon('sound'), h('span', { 'data-testid': 'listen-homework-label' }, '听作业')), h('p', { 'data-testid': 'listen-homework-status', role: 'status', 'aria-live': 'polite', style: { margin: '0', textAlign: 'center' } }), h('div.j-act.j-act-wide', { 'data-testid': unknown ? 'save-unknown' : 'joey-task-actions' }, photoBtn, doneBtn, escape, window.TaskPlanning.undoButton(t, () => { last = {}; render(); })), media), hear()] }));

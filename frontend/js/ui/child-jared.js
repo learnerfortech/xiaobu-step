@@ -7,7 +7,7 @@
 const { h, icon, mascot, kindOf, Prefs, pastBoundary } = window.UI;
 const { AudioPlayer, openMaterial, isImageUrl } = window.Media;
 const S = window.Store, CH = 'child_a', Planning = window.TaskPlanning;
-const CTA = { todo: '开始', doing: '继续', paused: '✕ 未完成', help: '继续', pending_parent: '已提交，等妈妈检查', done: '已完成' };
+const CTA = { todo: '开始', doing: '继续', paused: '✕ 未完成', help: '请妈妈看看', pending_parent: '已提交，等妈妈检查', done: '已完成' };
 const readingChoice = t => t.task_kind === 'reading' && t.title === '自己选一本书读一会儿';
 const displayTitle = t => (t.carried_over && !Planning.isWeekly(t) ? ((Date.parse(t.day) - Date.parse(t.planned_day)) === 86400000 ? '昨天顺延 · ' : '顺延 · ') : '') + t.title;
 const HISTORY_STATUS = { todo: '未完成', doing: '进行中', paused: '✕ 未完成', help: '需要帮助', pending_parent: '已提交，等妈妈检查', done: '已完成' };
@@ -87,6 +87,32 @@ function adjustedNotes(st) {
   return h('section.adjusted-notes', { 'aria-label': '今天已调整的安排', 'data-testid': 'adjusted-today' },
     ...st.adjusted.map(t => h('p', {}, t.title + ' · 已调整，今天不用做')));
 }
+function needsPlanPanel(tasks, group) {
+  const items = tasks.filter(t => !group || groupOf(t) === group);
+  if (viewingHistory() || !items.length) return null;
+  return h('details.week-overview.needs-plan', { 'data-testid': 'weekly-needs-plan', 'aria-label': '周作业待家长安排' },
+    h('summary', {}, '周作业待家长安排 · ' + items.length + '份'),
+    h('p', {}, '总量和已做进度都在这里，今天没有自动加上这些内容。可以请妈妈帮忙安排。'),
+    ...items.map(t => h('div.week-portion', {}, h('strong', {}, t.portion_label || t.title),
+      t.progress_note ? h('p.planning-progress', {}, '已做到：' + t.progress_note) : null,
+      h('button.c-mini', { type: 'button', onclick: () => { last = {}; App.go('#/jared/task/' + t.id); } }, '查看这一份'))));
+}
+function countText(tasks) {
+  return '待做 ' + tasks.filter(t => ACTIVE.includes(t.status)).length
+    + ' · 待检查 ' + tasks.filter(t => t.status === 'pending_parent').length
+    + ' · 已完成 ' + tasks.filter(t => t.status === 'done').length;
+}
+function resumeCard(tasks) {
+  if (viewingHistory()) return null;
+  const active = tasks.filter(t => ACTIVE.includes(t.status));
+  const t = active.find(t => t.status === 'doing') || active.find(t => t.status !== 'help' && t.progress_note?.trim());
+  if (!t) return null;
+  return h('section.task-resume', { 'data-testid': 'resume-task', 'data-task-id': t.id, 'aria-label': '接着做' },
+    h('h2', {}, '接着做'), h('strong', {}, t.title),
+    t.progress_note ? h('p.planning-progress', {}, '上次做到：' + t.progress_note) : null,
+    h('button.c-btn.primary', { type: 'button', 'data-testid': 'resume-go', onclick: () => App.go('#/jared/task/' + t.id) }, '继续这一份'),
+    h('p.planning-meta', {}, '也可以从下面选另一项。'));
+}
 function weekPanel(st) {
   if (window.APP_CONFIG.TRANSPORT !== 'lan' || !st.week?.length) return null;
   const items = ownTasks(st.week), required = items.filter(t => !t.plan?.optional);
@@ -125,65 +151,82 @@ function home(root, group = null) {
       h('button.c-btn.primary', { type: 'button', 'data-testid': 'retry-load', onclick: () => S.load('child', CH) }, icon('refresh'), '再试一次'))));
     mascot(host, 'think'); return;
   }
-  const { key, list } = ordered(ownTasks(st.tasks));
+  const day = st.day || selectedDay();
+  const view = Planning.dayView(ownTasks(st.tasks), day);
+  const needsPlan = Planning.dayView([...ownTasks(st.tasks), ...ownTasks(st.week)], day).needsPlan;
+  const { key, list } = ordered(view.today);
   if (group && !GROUPS.includes(group)) return App.go('#/jared');
   const pend = Object.values(S.pending).filter(p => p.body.child_id === CH && p.state === 'unknown');
   const banner = pend.length ? h('div.c-banner.warn', { role: 'status', 'data-testid': 'pending-banner' }, h('span', {}, '还没存上'),
     h('button.c-mini', { type: 'button', onclick: async () => { for (const p of pend) await S.retry(p.key); } }, icon('refresh'), '再试一次')) : null;
-  if (!list.length) {
+  if (!list.length && !view.itineraries.length && !needsPlan.length) {
     const host = h('div.buddy.md');
     root.replaceChildren(screen('jared-empty', homeTop(), dateNav(), h('section.c-state', { 'data-testid': 'state-empty' }, host, h('h2', {}, viewingHistory() ? '这一天没有作业记录' : '今天没有任务')), Progress.homeBuddy('child_a'), Pledge.entry(), adjustedNotes(st), Planning.weekSummary(st.week, st.day), weekPanel(st)));
     mascot(host, 'happy'); return;
   }
   const active = list.filter(t => ACTIVE.includes(t.status));
   const ordering = !viewingHistory() && !!home._ordering;
-  const firstActive = active[0] && active[0].id;
+  const firstActive = active.find(t => !group || groupOf(t) === group)?.id;
   const renderCard = t => {
     const i = list.indexOf(t);
     const k = kindOf(t);
     return h('li.rcard' + (t.id === firstActive ? '.now' : '') + (ACTIVE.includes(t.status) ? '' : '.quiet'), {},
       h('button.rcard-main', { type: 'button', 'data-testid': t.id === firstActive ? 'next-go' : null, onclick: () => App.go('#/jared/task/' + t.id) },
         h('span.rcard-ic.' + k.hue, { 'aria-hidden': 'true' }, icon(k.icon)),
-        h('span.rcard-txt', {}, h('span.rcard-title', {}, taskTitle(t, displayTitle(t))), h('span.rcard-meta', {}, k.child + (Number.isInteger(t.exp_award) ? ' · +' + t.exp_award + ' 经验' : '') + (t.planned_day && t.planned_day < st.day ? (Planning.isWeekly(t) ? ' · 原计划 ' : ' · 从 ') + t.planned_day.slice(5) + (Planning.isWeekly(t) ? '' : ' 顺延') : ''))),
+        h('span.rcard-txt', {}, h('span.rcard-title', {}, taskTitle(t, displayTitle(t))), h('span.rcard-meta', {}, k.child + (Number.isInteger(t.exp_award) ? (t.status === 'pending_parent' ? ' · 经验待确认' : ' · +' + t.exp_award + ' 经验') : '') + (t.planned_day && t.planned_day < st.day ? (Planning.isWeekly(t) ? ' · 原计划 ' : ' · 从 ') + t.planned_day.slice(5) + (Planning.isWeekly(t) ? '' : ' 顺延') : ''))),
         h('span.rcard-cta.' + t.status, {}, statusMark(t), (viewingHistory() ? HISTORY_STATUS[t.status] : CTA[t.status]) || '')),
       !viewingHistory() && ACTIVE.includes(t.status) ? h('button.c-mini', { type:'button', 'data-testid':'mark-unfinished', disabled:!!S.pendingFor('task:'+t.id)||t.status==='paused', onclick:async()=>{ await S.feedback('child',t,'paused'); render(); } }, t.status==='paused'?'✕ 未完成':'✕ 标为未完成') : null,
-      ordering ? h('span.rcard-order', {},
+      ordering && i >= 0 ? h('span.rcard-order', {},
         h('button.c-mini.sq', { type: 'button', 'aria-label': '上移：' + t.title, disabled: i === 0 || groupOf(list[i - 1]) !== groupOf(t), onclick: () => move(key, list, i, -1, root) }, icon('up')),
         h('button.c-mini.sq', { type: 'button', 'aria-label': '下移：' + t.title, disabled: i === list.length - 1 || groupOf(list[i + 1]) !== groupOf(t), onclick: () => move(key, list, i, 1, root) }, icon('down'))) : null);
   };
   // 首页三张分类卡；点开才见该列表。自己选一本书不进卡（loose）。
   const orderBtn = h('button.c-mini', { type: 'button', 'aria-pressed': String(ordering), 'data-testid': 'order-toggle', onclick: () => { home._ordering = !ordering; home(root, selectedGroup); } }, icon(ordering ? 'check' : 'up'), ordering ? null : icon('down'), ordering ? '好了' : '排顺序');
   let doneBox = null;
-  if (!active.length && !viewingHistory()) { const host = h('div.buddy.sm'); doneBox = h('section.c-alldone', { 'data-testid': 'state-alldone' }, host, h('h2', {}, '今天都做完啦')); setTimeout(() => mascot(host, 'happy'), 0); }
+  if (list.length && !active.length && !viewingHistory()) {
+    const host = h('div.buddy.sm'), waiting = list.filter(t => t.status === 'pending_parent').length;
+    doneBox = h('section.c-alldone', { 'data-testid': 'state-alldone' }, host,
+      h('h2', {}, waiting ? '今天安排已提交' : '今天安排已完成'),
+      waiting ? h('p', {}, waiting + '项等妈妈检查，确认后再加经验。') : null);
+    setTimeout(() => mascot(host, 'happy'), 0);
+  }
 
   let cards;
   if (group) {
     const visible = list.filter(t => groupOf(t) === group);
+    const unfinished = visible.filter(t => ACTIVE.includes(t.status)), submitted = visible.filter(t => !ACTIVE.includes(t.status));
     cards = h('div', { 'data-testid': 'task-list' },
       h('header.c-top', {}, h('button.c-mini', { type: 'button', onclick: () => App.go('#/jared') }, '返回分类'), h('h1', {}, GROUP_LABEL[group] || group)),
       viewingHistory() ? null : h('div.c-list-tools', {}, orderBtn),
-      h('ol.rlist', {}, ...visible.map(renderCard)),
+      h('p.task-day-count', { 'data-testid': 'group-day-count' }, countText(visible)),
+      unfinished.length ? h('section.task-day-section', {}, h('h2', {}, viewingHistory() ? '这天的未完成记录' : '接下来'), h('ol.rlist', {}, ...unfinished.map(renderCard))) : null,
+      submitted.length ? h('section.task-day-section', {}, h('h2', {}, viewingHistory() ? '这天已做' : '今天已做'), h('ol.rlist', {}, ...submitted.map(renderCard))) : null,
       visible.length ? null : h('p', {}, '这类今天没有作业。'));
   } else {
     const doors = h('nav.jared-group-cards.j-home-flow', { 'aria-label': '作业分类', 'data-testid': 'jared-groups' },
       ...GROUPS.map(name => {
         const items = list.filter(t => groupOf(t) === name);
-        const remaining = items.filter(t => !['done', 'pending_parent'].includes(t.status)).length;
         const hue = name === '学校作业' ? 'school' : name === '英语作业' ? 'english' : 'thinking';
         const ic = name === '英语作业' ? 'star' : name === '高途' ? 'book' : 'pencil';
-        const sub = items.length ? ('剩 ' + remaining + '／' + items.length + ' 项') : '今天没有';
+        const sub = items.length ? countText(items) : '今天没有安排';
         return h('button.j-flow-card.' + hue, { type: 'button', 'data-testid': 'jared-group-card', 'data-group': name, onclick: () => App.go('#/jared/group/' + encodeURIComponent(name)) },
           h('span.j-flow-icon', { 'aria-hidden': 'true' }, icon(ic)),
           h('span.j-flow-copy', {}, h('strong', {}, GROUP_LABEL[name] || name), h('span', {}, sub)),
           h('span.j-flow-arrow', { 'aria-hidden': 'true' }, '›'));
       }));
-    const loose = list.filter(t => !groupOf(t));
+    const reading = list.filter(readingChoice), loose = list.filter(t => !groupOf(t) && !readingChoice(t));
     cards = h('div', { 'data-testid': 'task-list' }, doors,
-      loose.length ? h('section.j-itineraries', { 'aria-label': '今天行程' }, h('h2', {}, '今天行程'), h('ol.rlist', {}, ...loose.map(renderCard))) : null);
+      reading.length ? h('section.j-reading', { 'data-testid': 'today-reading', 'aria-label': '我的阅读' }, h('h2', {}, '我的阅读'), h('ol.rlist', {}, ...reading.map(renderCard))) : null,
+      loose.length ? h('section', { 'aria-label': '其他安排' }, h('h2', {}, '其他安排'), h('ol.rlist', {}, ...loose.map(renderCard))) : null,
+      view.itineraries.length ? h('section.j-itineraries', { 'data-testid': 'today-itineraries', 'aria-label': '今天行程' }, h('h2', {}, '今天行程'), h('ol.rlist', {}, ...view.itineraries.map(renderCard))) : null);
   }
 
   // 伙伴在上；三张分类卡紧跟，作业不再整页摊开一大串。
-  root.replaceChildren(screen(active.length ? 'jared-home' : 'jared-alldone', homeTop(), dateNav(), banner, doneBox, group ? null : Progress.homeBuddy('child_a'), group ? null : Pledge.entry(), cards, adjustedNotes(st), (!group || group==='英语作业') ? Planning.weekSummary(st.week, st.day) : null, group ? null : weekPanel(st)));
+  root.replaceChildren(screen(active.length || !list.length ? 'jared-home' : 'jared-alldone', homeTop(), dateNav(), banner, doneBox,
+    group ? null : Progress.homeBuddy('child_a'), group ? null : Pledge.entry(),
+    group ? null : h('p.task-day-count', { 'data-testid': 'today-count' }, countText(list)),
+    group ? null : resumeCard(list), cards, adjustedNotes(st), needsPlanPanel(needsPlan, group),
+    (!group || group==='英语作业') ? Planning.weekSummary(st.week, day) : null, group ? null : weekPanel(st)));
 }
 
 function move(key, list, i, d, root) { if (!list[i + d] || groupOf(list[i]) !== groupOf(list[i + d])) return; const ids = list.map(t => t.id); [ids[i], ids[i + d]] = [ids[i + d], ids[i]]; Prefs.set(key, ids); home(root, selectedGroup); }
@@ -198,13 +241,13 @@ function task(root, id) {
   if (!t || t.child_id !== CH) return App.go('#/jared');
   if (!viewingHistory() && last.id === id && last.outcome) return result(root, t, last.outcome);
   const k = kindOf(t), op = S.pendingFor('task:' + t.id);
-  const { list } = ordered(ownTasks(st.tasks));
+  const { list } = ordered(Planning.dayView(ownTasks(st.tasks), st.day || selectedDay()).today);
   const card = [h('span.tcard-ic.' + k.hue, { 'aria-hidden': 'true' }, icon(k.icon)), h('h1.tcard-title', { 'data-testid': 'task-title' }, taskTitle(t, displayTitle(t)))];
   if (t.original_requirement) card.push(h('section.task-requirement', { 'data-testid': 'original-requirement' },
     h('h2', {}, '老师的原话'), h('p.req-text', {}, t.original_requirement)));
   card.push(...Planning.details(t));
   if (Number.isInteger(t.exp_award)) card.push(h('p.tcard-exp', { 'data-testid': 'task-exp' }, '做好了可得 +' + t.exp_award + ' 经验'));
-  if (t.first_step && t.first_step !== t.original_requirement) card.push(h('p.tcard-step', {}, t.first_step));
+  if (t.first_step && t.first_step !== t.original_requirement) card.push(h('section.task-first-step', { 'data-testid': 'task-first-step' }, h('h2', {}, '先做这一步'), h('p.tcard-step', {}, t.first_step)));
   const attached = Planning.materials(t, { beforeOpen: () => stopMedia() });
   const stops = [attached.stop], legacy = attached.legacy;
   card.push(...attached.nodes);
@@ -223,6 +266,8 @@ function task(root, id) {
   if (task._notice === id) box.append(h('div.c-banner.info', { 'data-testid': 'conflict-note' }, icon('refresh'), '已更新'));
   const busy = op && op.state === 'saving';
   const finished = ['done', 'pending_parent'].includes(t.status);
+  const canAskLess = Planning.isWeekly(t) && ['英语作业', '高途'].includes(t.home_group)
+    && ACTIVE.includes(t.status) && t.planned_day === selectedDay();
   const actions = viewingHistory() ? h('nav.t-actions', {}, h('p', {}, '历史回看 · ' + (HISTORY_STATUS[t.status] || '未完成')), h('button.c-btn.primary', { type: 'button', onclick: () => chooseDay(window.APP_CONFIG.today()) }, '回到今天')) : finished ? h('nav.t-actions', { 'aria-label': '操作' }, h('div.t-status', {}, statusMark(t), CTA[t.status]), Planning.undoButton(t, () => { last = {}; render(); }))
     : h('nav.t-actions', { 'aria-label': '操作' },
       h('button.c-btn.primary.big', { type: 'button', 'data-testid': 'act-done', disabled: busy, onclick: async () => {
@@ -231,8 +276,10 @@ function task(root, id) {
         act(t, 'done');
       } }, icon('check'), busy ? '…' : paperish ? '提交' : '完成'),
       window.APP_CONFIG.TRANSPORT === 'lan' ? h('button.c-mini', { type: 'button', 'data-testid': 'record-progress', disabled: !!op, onclick: () => Planning.progress(t, () => { last = {}; render(); }) }, '记下做到哪里') : null,
-      h('button.c-btn.sun', { type: 'button', 'data-testid': 'act-help', disabled: busy, onclick: () => requestHelp(t) }, icon('hand'), '需要帮助'));
-  const dots = h('ol.t-dots', { 'aria-label': `第 ${list.findIndex(x => x.id === t.id) + 1} 个，共 ${list.length} 个` },
+      h('button.c-btn.sun', { type: 'button', 'data-testid': 'act-help', disabled: !!op, onclick: () => requestHelp(t) }, icon('hand'), '需要帮助'),
+      canAskLess ? h('button.c-mini', { type: 'button', 'data-testid': 'request-less-today', disabled: !!op, onclick: () => requestHelp(t, '今天安排有点多，请帮我调整。') }, '申请今天少做一点') : null);
+  const at = list.findIndex(x => x.id === t.id);
+  const dots = at < 0 ? null : h('ol.t-dots', { 'aria-label': `今天第 ${at + 1} 个，共 ${list.length} 个` },
     ...list.map(x => h('li.' + (x.id === t.id ? 'cur' : ['done', 'pending_parent'].includes(x.status) ? 'done' : 'todo'), { 'aria-hidden': 'true' })));
   root.replaceChildren(screen('jared-task',
     h('header.c-top.task', {}, h('button.c-icon-btn', { type: 'button', 'data-testid': 'back', 'aria-label': '返回', onclick: () => App.go(groupRoute(t)) }, icon('back'), '返回'),
@@ -267,10 +314,10 @@ function finishReading(t) {
   } }, '完成');
   d = window.UI.dialog({ title: '读完啦', audience: 'child', body: h('div', {}, h('label', {}, '大约读了几分钟（选填）', input), hint), actions: [h('button.c-btn.ghost', { type: 'button', onclick: () => d.close(false) }, '先不交'), submit], onClose: () => render() });
 }
-async function requestHelp(t) {
+async function requestHelp(t, initial) {
   if (S.pendingFor('task:' + t.id)) return;
   stopMedia(); window.Voice && Voice.stop();
-  const note = await window.UI.helpNoteDialog(t.help_note || '');
+  const note = await window.UI.helpNoteDialog(initial || t.help_note || '');
   if (note !== null) return act(t, 'help', false, { help_note: note });
 }
 async function act(t, status, retry, extra) {

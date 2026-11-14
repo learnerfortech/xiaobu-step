@@ -7,6 +7,44 @@ const paper = t => ['paper', 'legacy'].includes(t.task_kind);
 const needsPhoto = t => t.child_id === 'child_a' && paper(t) && t.photo_required !== false;
 const shortDay = d => d ? d.slice(5).replace('-', '/') : '待安排';
 const materialKindLabels = { explanation: '讲解', exercise: '练习', prompt: '题图', model: '范文', answer: '答案', audio: '音频', link: '外部网站' };
+const active = t => ['todo', 'doing', 'paused', 'help'].includes(t.status);
+const isItinerary = t => t.work_type === 'itinerary' || !!t.itinerary || String(t.id || '').startsWith('itinerary-') || t.home_group === 'itinerary';
+
+// This is a view of existing tasks, never a new day's copy or a date mutation.
+const needsPlanning = (t, day) => isWeekly(t) && active(t) && (!t.planned_day || t.planned_day < day);
+function dayView(tasks, day) {
+  const view = { today: [], needsPlan: [], itineraries: [] }, seen = new Set();
+  for (const t of tasks || []) {
+    if (seen.has(t.id) || ['archived', 'cancelled', 'canceled', 'deleted'].includes(t.status)) continue;
+    seen.add(t.id);
+    const submitted = ['done', 'pending_parent'].includes(t.status);
+    if (!submitted && t.planned_day && t.planned_day > day) continue;
+    if (isItinerary(t)) view.itineraries.push(t);
+    else if (needsPlanning(t, day)) view.needsPlan.push(t);
+    else view.today.push(t);
+  }
+  return view;
+}
+
+// Only a timezone-bearing recorded deadline supplies a time. Date-only tasks stay date-only.
+function deadlineInfo(t) {
+  const raw = t.plan?.deadline;
+  // Older imports may use a space or lower-case t, both already accepted by
+  // the server. Normalize for display only; never rewrite the source value.
+  const normalized = typeof raw === 'string' ? raw.replace(/^(\d{4}-\d{2}-\d{2})[t ]/, '$1T') : raw;
+  if (typeof normalized === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(normalized) && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized)) {
+    const instant = new Date(normalized);
+    if (Number.isFinite(instant.getTime())) {
+      const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).formatToParts(instant).map(p => [p.type, p.value]));
+      const date = parts.year + '-' + parts.month + '-' + parts.day;
+      return { date, label: date + ' ' + parts.hour + ':' + parts.minute, exact: true, conflict: !!t.due_day && t.due_day !== date };
+    }
+  }
+  return { date: t.due_day || null, label: t.due_day || '', exact: false, conflict: false };
+}
 
 function taskTitle(t, title) {
   const complete = ['done', 'pending_parent'].includes(t.status);
@@ -17,9 +55,11 @@ function taskTitle(t, title) {
 
 function details(t, parent = false) {
   const nodes = [];
+  const deadline = deadlineInfo(t);
   if (parent) nodes.push(h('p.planning-meta', {}, '录入：' + (t.created_day || '旧记录未注明')));
   if (t.planned_day || isWeekly(t)) nodes.push(h('p.planning-meta', {}, '计划：' + shortDay(t.planned_day)));
-  if (t.due_day) nodes.push(h('p.planning-meta', { 'data-testid': 'teacher-deadline' }, '老师截止：' + t.due_day));
+  if (deadline.label) nodes.push(h('p.planning-meta', { 'data-testid': 'teacher-deadline' }, '老师截止：' + deadline.label));
+  if (parent && deadline.conflict) nodes.push(h('p.planning-note', { 'data-testid': 'deadline-conflict' }, '截止日期与精确时间记录不一致，请核对老师原要求。当前显示已记录的精确时间，单独记录的日期是 ' + t.due_day + '。'));
   if (t.deadline_passed && !['done', 'pending_parent'].includes(t.status)) nodes.push(h('p.planning-note', { 'data-testid': 'deadline-support' }, parent
     ? '老师的截止日期已到，还有内容没完成。请一起选出现在能做的一小步，并与老师协调。'
     : '老师的截止日期已到。可以先做一小步，也可以请妈妈帮忙安排。'));
@@ -152,13 +192,12 @@ function weekSummary(tasks, viewDay = APP_CONFIG.today()) {
   if (!sets.size) return null;
   return h('section.week-summary', {'data-testid':'weekly-english-summary'}, ...[...sets.values()].map(items=>{
     const plan=items[0].plan, done=items.filter(t=>t.status==='done').length, pending=items.filter(t=>t.status==='pending_parent').length;
-    const deadline=plan.deadline, date=deadline?.slice(0,10), time=deadline?.slice(11,16);
-    const weekday=date ? ['周日','周一','周二','周三','周四','周五','周六'][new Date(date+'T12:00:00Z').getUTCDay()] : '';
-    return h('div',{},h('h2',{},'本周英语'),h('p',{},shortDay(plan.start)+'–'+shortDay(plan.end)+(deadline?' · '+weekday+' '+time+' 前交':'')),
+    const deadline=deadlineInfo(items[0]);
+    return h('div',{},h('h2',{},'本周英语'),h('p',{},shortDay(plan.start)+'–'+shortDay(plan.end)+(deadline.label?' · '+deadline.label+' 前交':'')),
       h('p',{},'已完成 '+done+' 项 · 还剩 '+(items.length-done-pending)+' 项'+(pending?' · 待家长检查 '+pending+' 项':'')),
       h('p.planning-meta',{},'以下是本周总量，建议日期可由家长调整；不表示今天都要做完。'));
   }));
 }
 
-window.TaskPlanning = { weekSummary, taskTitle, materialKindLabels, isWeekly, paper, needsPhoto, shortDay, details, materials, progress, undoButton, recordGroup };
+window.TaskPlanning = { dayView, needsPlanning, deadlineInfo, weekSummary, taskTitle, materialKindLabels, isWeekly, paper, needsPhoto, shortDay, details, materials, progress, undoButton, recordGroup };
 })();

@@ -45,6 +45,26 @@ def date_value(value, field):
     return value
 
 
+def exact_deadline(task):
+    """Read an existing teacher timestamp only when its timezone is explicit."""
+    plan = task.get('plan')
+    raw = plan.get('deadline') if isinstance(plan, dict) else None
+    if not isinstance(raw, str):
+        return None
+    try:
+        value = datetime.datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return value if value.tzinfo is not None else None
+
+
+def teacher_due_day(task):
+    exact = exact_deadline(task)
+    if exact is not None:
+        return exact.astimezone(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()
+    return task.get('due_day')
+
+
 def work_type(task):
     if task.get('work_type') in WORK_TYPES:
         return task['work_type']
@@ -110,6 +130,12 @@ def metadata(body, task=None, new=False):
     for key in ('planned_day', 'due_day'):
         if key in body:
             result[key] = date_value(body[key], key)
+    if 'due_day' in result and exact_deadline(task) is not None:
+        # The date-only editor must not silently contradict or remove a known
+        # precise teacher deadline. Keep legacy unchanged values compatible;
+        # an explicit save may align an old date to the preserved timestamp.
+        check(result['due_day'] == task.get('due_day')
+              or result['due_day'] == teacher_due_day(task), 'exact_deadline_preserved', 409)
     if 'work_type' in body:
         check(body['work_type'] in WORK_TYPES, 'invalid_work_type')
         result['work_type'] = body['work_type']
@@ -139,7 +165,7 @@ def metadata(body, task=None, new=False):
 
 
 def planning_warning(task):
-    due, planned = task.get('due_day'), planned_day(task)
+    due, planned = teacher_due_day(task), planned_day(task)
     if due and planned and planned > due:
         return 'planned_after_due'
     if due and planned is None and task.get('status') in ACTIVE:
@@ -171,12 +197,7 @@ def groups(tasks):
 
 def deadline_passed(task, now=None):
     now = now or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    raw = (task.get('plan') or {}).get('deadline')
-    if raw:
-        try:
-            due = datetime.datetime.fromisoformat(raw)
-            if due.tzinfo is not None:
-                return now > due
-        except (ValueError, TypeError):
-            pass
+    due = exact_deadline(task)
+    if due is not None:
+        return now > due
     return bool(task.get('due_day') and task['due_day'] < now.date().isoformat())

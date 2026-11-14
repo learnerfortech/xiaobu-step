@@ -597,3 +597,29 @@ button.p-tile[aria-pressed="true"] { border-color:currentColor; box-shadow:0 0 0
 .week-summary { margin:16px 0; padding:16px; border-radius:16px; background:#edf5ef; color:#173e35; border:1px solid #9db5a9; }
 .week-summary h2 {margin:0 0 8px;font-size:22px;}
 .task-day-section.weekly {border-left:4px solid #648776;padding-left:12px;}
+
+/* Today's focus uses the existing cards; totals and review states stay explicit. */
+.c-screen .task-day-count{margin:0;font:700 17px/1.6 var(--ts-font-cn);color:#263e35;overflow-wrap:anywhere}
+.c-screen .task-resume{display:grid;gap:10px;width:min(100%,860px);padding:18px;border:2px solid #648776;border-radius:22px;background:#edf5ef;color:#173e35}
+.c-screen .task-resume h2,.c-screen .task-day-section h2,.c-screen .j-reading h2{margin:0 0 6px;font:800 22px/1.4 var(--ts-font-cn)}
+.c-screen .task-resume>strong{font:800 21px/1.5 var(--ts-font-cn);overflow-wrap:anywhere}
+.c-screen .task-resume>p{margin:0}
+.c-screen .task-resume>.c-btn{justify-self:start}
+.c-screen .task-day-section+.task-day-section{margin-top:24px}
+.c-screen .j-reading{margin-top:18px}
+.c-screen .needs-plan>summary,.c-screen .joey-needs-plan>summary{min-height:48px;overflow-wrap:anywhere}
+.c-screen .needs-plan>p{line-height:1.6;overflow-wrap:anywhere}
+.c-screen .task-first-step{width:100%;padding:12px 14px;border-left:4px solid #648776;border-radius:10px;background:#edf5ef;color:#263e35}
+.c-screen .task-first-step h2{margin:0 0 6px;font:800 18px/1.4 var(--ts-font-cn)}
+.c-screen .task-first-step p{margin:0;overflow-wrap:anywhere}
+.jared .rcard-cta{line-height:1.4;overflow-wrap:anywhere}
+.jared .rcard-meta{line-height:1.5}
+.jared .c-alldone{flex-wrap:wrap}
+.jared .c-alldone>p{flex-basis:100%;margin:0 0 6px;line-height:1.6}
+:is(.c-screen.jared,.c-screen.joey,.dlg[data-audience=child]) .c-btn.primary{background:linear-gradient(180deg,#5FE27F 0%,#2CC55A 70%);color:#0b3d1c;text-shadow:none}
+.jared .rcard-cta:is(.todo,.doing,.paused){background:#2CC55A;color:#0b3d1c}
+.p-row [data-testid=help-snippet]{line-height:1.5;overflow-wrap:anywhere;color:#263e35}
+@media(max-width:600px){
+  .c-screen .task-resume{padding:14px}
+  .c-screen .task-resume>.c-btn{width:100%}
+}

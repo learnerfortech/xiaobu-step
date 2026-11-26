@@ -15,6 +15,7 @@ from urllib.parse import urlsplit, parse_qs, unquote
 from pledges import Pledges, RULES, FORM_NAMES, form_for_lifetime, form_thresholds_for
 from local_speech import LocalSpeech
 from photos import Photos
+from intake import Intake, Invalid
 
 def award_points(task, task_id):
     """Per-task difficulty EXP from payload.exp_award; itinerary/default fallback. Cap 50."""
@@ -35,7 +36,7 @@ def lifetime_exp(con, child):
 
 PREFIX = '/lan/family/'
 CHILDREN = {'child_a', 'child_b'}
-KINDS = {'paper', 'reading', 'audio', 'legacy'}
+KINDS = {'paper', 'reading', 'audio', 'legacy', 'itinerary'}
 
 
 class Rejected(Exception):
@@ -150,6 +151,9 @@ class Tasks:
                 t['first_step'] = '昨天没读完，今天补上；读完再点完成。' + (t.get('first_step') or '')
             if role == 'child':
                 t.pop('parent_note', None)
+                if t.get('intake_sheet'):
+                    for key in ('sources','source_ids','source_original','source_text','original_requirement'):
+                        t.pop(key, None)
             return t
         def visible(t):
             if role == 'child' and (t['status'] in {'archived', 'cancelled', 'canceled', 'deleted'} or t['assignment_state'] == 'pending'):
@@ -349,6 +353,7 @@ class Tasks:
 
 def handler(root, tasks, lan_ip, pledges=None, photos=None):
     root = Path(root).resolve()
+    notebook = Intake(tasks, root, validate_fields=fields)
     speech = LocalSpeech(cache_dir=tasks.db.parent / 'speech-cache', natural_enabled=True)
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -408,6 +413,22 @@ def handler(root, tasks, lan_ip, pledges=None, photos=None):
                     try: self.wfile.write(audio)
                     except (BrokenPipeError, ConnectionResetError): pass
                 return
+            if path == '/lan/notebook/asset':
+                try:
+                    token = parse_qs(urlsplit(self.path).query).get('token',[''])[0]
+                    asset, mime = notebook.asset(token)
+                    with asset.open('rb') as stream:
+                        self.send_response(200)
+                        self.send_header('Content-Type', mime)
+                        self.send_header('Content-Length', str(asset.stat().st_size))
+                        self.end_headers()
+                        if self.command != 'HEAD':
+                            self.copyfile(stream, self.wfile)
+                except (BrokenPipeError, ConnectionResetError):
+                    self.close_connection = True
+                except (Invalid, OSError, ValueError):
+                    self.reply(404, {'message':'附件暂不可用。'})
+                return
             if path == '/lan/health':
                 self.reply(200, {'service': 'xiaobu-lan', 'dataset': 'lan', 'version': 1})
                 return
@@ -462,6 +483,29 @@ def handler(root, tasks, lan_ip, pledges=None, photos=None):
                 return
             path = urlsplit(self.path).path
             ctype = self.headers.get('Content-Type', '').split(';')[0].strip()
+            if path.startswith('/lan/notebook/'):
+                action = path.rsplit('/', 1)[-1]
+                if action not in {'ocr','organize','publish','status','rules','update-materials','upload'}:
+                    self.reply(404,{'message':'没有这项操作。'})
+                    return
+                try:
+                    size = int(self.headers.get('Content-Length','0'))
+                    limit = (25 if action == 'upload' else 4) * 1024 * 1024
+                    require(0 < size <= limit and not self.headers.get('Transfer-Encoding'))
+                    require(action == 'upload' or ctype == 'application/json')
+                    self.connection.settimeout(30)
+                    raw = self.rfile.read(size)
+                    require(len(raw) == size)
+                    if action == 'upload':
+                        response = notebook.upload(raw,ctype)
+                    else:
+                        response = notebook.request(action,json.loads(raw))
+                except (Rejected,ValueError,OSError):
+                    self.close_connection = True
+                    self.reply(400,{'message':'作业资料格式不合适，请检查后重试。'})
+                    return
+                self.reply(*response)
+                return
             # Child homework photo upload: raw image body (not JSON).
             if path.endswith('/photos') and path.startswith(PREFIX) and '/child/' in path and ctype.startswith('image/'):
                 if not photos:

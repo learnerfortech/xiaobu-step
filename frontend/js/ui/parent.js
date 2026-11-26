@@ -637,8 +637,13 @@ function moreTab() {
   return [h('section.p-card.p-menu', { 'data-testid': 'parent-more' }, h('h2.p-child-name', {}, '更多'), ...entries.map(([key, label, ic]) =>
     h('button.p-row', { type: 'button', 'data-testid': 'more-entry-' + key, onclick: () => openParentTab(key) }, h('span.p-kind', { 'aria-hidden': 'true' }, icon(ic)), h('span.p-row-main', {}, label), h('span.p-row-go', {}, icon('chevron')))))];
 }
+let intakeView;
 function parentPage() {
   if (tab === 'today') return todayTab();
+  if (tab === 'add' && C.TRANSPORT === 'lan') {
+    if (!intakeView) intakeView = Notebook.mount(today(), loadAll, {child:who});
+    return [intakeView];
+  }
   if (tab === 'more' && C.TRANSPORT === 'lan') return moreTab();
   let page;
   switch (tab) {
@@ -657,8 +662,8 @@ function render() {
   const separateToday = C.TRANSPORT === 'lan' && tab === 'today';
   if (separateToday && !KIDS.includes(who)) who = KIDS[0];
   const y = window.scrollY;
-  const tabs = C.TRANSPORT === 'lan' ? [['today', '今天', 'home'], ['more', '更多', 'more']] : [['today', '今天', 'home'], ...(C.TRANSPORT === 'mock' ? [['photos', '照片', 'image']] : []), ['manage', '管理', 'pencil'], ['settings', '设置', 'gear']];
-  const activeTab = C.TRANSPORT === 'lan' && tab !== 'today' ? 'more' : tab;
+  const tabs = C.TRANSPORT === 'lan' ? [['today', '今天', 'home'], ['add', '添加作业', 'plus'], ['more', '更多', 'more']] : [['today', '今天', 'home'], ...(C.TRANSPORT === 'mock' ? [['photos', '照片', 'image']] : []), ['manage', '管理', 'pencil'], ['settings', '设置', 'gear']];
+  const activeTab = C.TRANSPORT === 'lan' && !['today','add'].includes(tab) ? 'more' : tab;
   const kidOptions = [...(separateToday ? [] : [['all', '全部']]), ...KIDS.map(c => [c, NAME(c)])];
   const kidsSel = tab === 'today' || tab === 'photos' || (C.TRANSPORT === 'lan' && tab === 'progress') ? h('div.p-who', { class: separateToday ? 'p-kid-pages' : null, role: 'tablist', 'aria-label': '孩子' },
     ...kidOptions.map(([v, l]) => h('button.p-who-opt', { type: 'button', role: 'tab', id: 'parent-kid-' + v, 'data-testid': 'parent-kid-' + v, 'aria-controls': separateToday ? 'parent-tasks-' + v : null, 'aria-selected': String(who === v), onclick: () => { who = v; render(); } },

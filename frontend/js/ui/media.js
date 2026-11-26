@@ -62,5 +62,16 @@ function openMaterial(url, title, { audience = 'child', backLabel = '回到任�
   return close;
 }
 const isImageUrl = u => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u) || /^data:image/.test(u);
-window.Media = { AudioPlayer, openMaterial, isImageUrl };
+function materialGroups(task,{audience='child',compact=false}={}){
+ const players=[];
+ const el=h('div.material-groups',{'data-testid':'material-groups'},...(task.materials||[]).map((g,i)=>{
+  const items=g.items||[],visual=items.filter(a=>a.kind!=='audio'),audio=items.filter(a=>a.kind==='audio');
+  return h('section.material-group',{},compact?null:h('h3',{},g.name||('材料 '+(i+1))),g.text&&!compact?h('p.material-text',{},g.text):null,
+   ...visual.map(a=>a.kind==='link'?h('a.c-btn',{href:a.url,target:'_blank',rel:'noopener noreferrer',onclick:()=>window.SoundFocus?.stopAll()},a.name):
+    h('button.c-btn.material-open',{type:'button',onclick:()=>{players.forEach(p=>p.stop());openMaterial(a.url,a.name,{audience,backLabel:audience==='parent'?'返回':'回到任务'});}},a.kind==='image'?h('img',{src:a.url,alt:a.name,loading:'lazy'}):null,h('span',{},a.name))),
+   ...audio.map(a=>{const p=AudioPlayer(a.url,{onPlay:()=>players.forEach(other=>{if(other!==p)other.stop();})});players.push(p);return h('div.material-audio',{},h('strong',{},a.name),p.el);}),
+   g.audio_required&&!audio.length?h('p.material-missing',{role:'status'},'这组未附音频'):null);
+ }));let mounted=false;const cleanup=new MutationObserver(()=>{if(el.isConnected)mounted=true;else if(mounted){players.forEach(p=>p.stop());cleanup.disconnect();}});cleanup.observe(document.body,{childList:true,subtree:true});return {el,stop(){players.forEach(p=>p.stop());}};
+}
+window.Media = { AudioPlayer, openMaterial, isImageUrl, materialGroups };
 })();

@@ -188,7 +188,8 @@ function task(root, id) {
   const { list } = ordered(ownTasks(st.tasks));
   const card = [h('span.tcard-ic.' + k.hue, { 'aria-hidden': 'true' }, icon(k.icon)), h('h1.tcard-title', { 'data-testid': 'task-title' }, displayTitle(t))];
   if (Number.isInteger(t.exp_award)) card.push(h('p.tcard-exp', { 'data-testid': 'task-exp' }, '做好了可得 +' + t.exp_award + ' 经验'));
-  if (t.first_step) card.push(h('p.tcard-step', {}, t.first_step));
+  if (t.first_step) card.push(h('p.tcard-step', {style:t.intake_sheet?{whiteSpace:'pre-wrap'}:null}, t.first_step));
+  if (t.materials?.length) card.push(Media.materialGroups(t).el);
   if (t.original_requirement && t.original_requirement !== t.first_step) {
     const p = h('p.req-text', { id: 'req', hidden: true }, t.original_requirement);
     const btn = h('button.c-link', { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'req', 'data-testid': 'req-toggle', onclick: () => {

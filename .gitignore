@@ -23,3 +23,9 @@ venv/
 frontend/给Codex_*.txt
 frontend/*执行单*
 frontend/*补丁*
+
+# Local homework intake
+.paddle-venv/
+intake-assets/
+notebook-rules.json
+lan-server/notebook-ocr

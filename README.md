@@ -77,3 +77,16 @@ python3 lan-server/server.py \
 ## 许可证
 
 代码采用 MIT License，见 [LICENSE](LICENSE)。第三方素材请以 [素材授权记录](ASSET_NOTICES.md) 中的逐项状态为准。
+
+### 从作业照片添加任务（Mac 局域网版）
+
+家长打开底栏「添加作业」，选图后点「一键识别」。左侧显示完整原图，右侧按科目编辑作业。请在标注处补全读不清的页码或题号，核对孩子与日期后点击「确认添加」。
+
+识别只在本机运行。Mac 自带的 Vision 可作为识别器，需安装命令行工具并从随附源码编译一次：
+
+```sh
+cd lan-server
+xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework ImageIO -framework CoreGraphics notebook_ocr.m -o notebook-ocr
+```
+
+已有离线 PaddleOCR 的环境也可以使用 `.paddle-venv` 和本机 PP-OCRv5 mobile 权重。未准备识别组件时，可以手动填写作业单。原图、未校对文字和真实任务数据库应留在家里设备。
